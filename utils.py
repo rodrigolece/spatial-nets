@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 from scipy import sparse
 from scipy.io import loadmat
+from typing import List
 
 from sklearn.metrics import pairwise
 
@@ -89,11 +90,11 @@ def sparsemat_remove_diag(spmat):
 #     return outflows, inflows
 
 
-# def flow_from_model(mat, ϵ, ids=None, convert_to_int=True):
+# def flow_from_model(mat, epsilon, ids=None, convert_to_int=True):
 #     """
 #     Put output of a model in a DataFrame flow format.
 #
-#     ϵ is the threshold above which flows are kept.
+#     epsilon is the threshold above which flows are kept.
 #     """
 #     n = mat.shape[0]
 #
@@ -102,7 +103,7 @@ def sparsemat_remove_diag(spmat):
 #     else:
 #         assert len(ids) == n, 'length of ids should match mat shape'
 #
-#     i, j = np.where(mat > ϵ)
+#     i, j = np.where(mat > epsilon)
 #     data = mat[i, j]
 #
 #     if convert_to_int:
@@ -113,7 +114,7 @@ def sparsemat_remove_diag(spmat):
 #     return df
 
 
-def benchmark_cerina(nb_nodes, edge_density, l, β, ϵ, L=1.0, seed=0, verbose=False):
+def benchmark_cerina(nb_nodes, edge_density, l, beta, epsilon, L=1.0, seed=0, verbose=False):
     """Create a benchmark network of the type proposed by Cerina et al."""
     N = nb_nodes
     nb_edges = nb_nodes * (nb_nodes - 1) * edge_density / 2
@@ -122,17 +123,17 @@ def benchmark_cerina(nb_nodes, edge_density, l, β, ϵ, L=1.0, seed=0, verbose=F
 
     # Coordinates
     ds = rng.exponential(scale=l, size=N)
-    αs = 2 * np.pi * rng.rand(N)
+    alphas = 2 * np.pi * rng.rand(N)
     shift = L * np.ones(N)
     shift[nb_nodes // 2 + 1:] *= -1
 
-    xs = ds * np.cos(αs) + shift
-    ys = ds * np.sin(αs)
+    xs = ds * np.cos(alphas) + shift
+    ys = ds * np.sin(alphas)
     coords = np.vstack((xs, ys)).T
 
     # Attibute assignment
     idx_plane = xs > 0
-    idx_success = rng.rand(N) < 1 - ϵ
+    idx_success = rng.rand(N) < 1 - epsilon
 
     comm_vec = np.zeros((N, 1), dtype=int)  # column vector
     comm_vec[np.bitwise_and(idx_plane, idx_success)] = 1
@@ -143,7 +144,7 @@ def benchmark_cerina(nb_nodes, edge_density, l, β, ϵ, L=1.0, seed=0, verbose=F
     # Edge selection
     smat = comm_vec.T * comm_vec
     dmat = pairwise.euclidean_distances(coords)
-    pmat = np.triu(np.exp(β * smat - dmat / l), k=1)  # keep i < j
+    pmat = np.triu(np.exp(beta * smat - dmat / l), k=1)  # keep i < j
 
     i, j = np.nonzero(pmat)
     probas = pmat[i, j]
@@ -170,16 +171,16 @@ def greatcircle_distance(long1, lat1, long2, lat2, R=6371):
         The radius of the Earth in km (default value is 6371).
 
     """
-    λ1, ϕ1, λ2, ϕ2 = map(np.radians, [long1, lat1, long2, lat2])
-    Δϕ = ϕ1 - ϕ2  # abs value not needed because of sin squared
-    Δλ = λ1 - λ2
+    lambda1, phi1, lambda2, phi2 = map(np.radians, [long1, lat1, long2, lat2])
+    Dphi = phi1 - phi2  # abs value not needed because of sin squared
+    Dlambda = lambda1 - lambda2
 
-    radical = np.sin(Δϕ / 2)**2 + np.cos(ϕ1) * np.cos(ϕ2) * np.sin(Δλ / 2)**2
+    radical = np.sin(Dphi / 2)**2 + np.cos(phi1) * np.cos(phi2) * np.sin(Dlambda / 2)**2
 
     return R * 2 * np.arcsin(np.sqrt(radical))
 
 
-def load_dmat(file: str):
+def load_dmat(file: str, exclude_positions: List[int] = None):
     """
     Read distance matrix from file.
 
@@ -203,17 +204,23 @@ def load_dmat(file: str):
     assert m == n, 'matrix should be square'
 
     idx_diag = np.diag_indices(n)
-    assert np.all(np.isclose(dmat[idx_diag], 0.0)), \
+    assert np.allclose(dmat[idx_diag], 0.0), \
         'diagonal elements should be zero'
 
     idx_tril = np.tril_indices(n, -1)
-    if np.all(np.isclose(dmat[idx_tril], 0.0)):
+    if np.allclose(dmat[idx_tril], 0.0):
         # TODO: default to upper triangular matrix in the other functions
         dmat = dmat + dmat.T
 
     if sparse.issparse(dmat):
         # sparse matrices are incompativle with masked arrays (io_matrix)
         dmat = np.asarray(dmat.todense())
+
+    if exclude_positions is not None:
+        mask = np.ones(m, dtype=bool)
+        mask[exclude_positions] = False
+        dmat = dmat[mask, :]
+        dmat = dmat[:, mask]
 
     return dmat
 
