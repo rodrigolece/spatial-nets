@@ -2,6 +2,7 @@ import os
 # import argparse
 import numpy as np
 from tabulate import tabulate
+from tqdm import tqdm
 
 from locations import *
 import utils
@@ -59,4 +60,33 @@ for dmat in dmat_files:
     tab = [[rows[i]] + results[i].tolist() for i in range(len(rows))]
 
     print(tabulate(tab, headers=cols, floatfmt='.3f'))
+    print()
+
+    # Calculate the number of significant edges
+    models = [pmat_prod, pmat_attrac, pmat_rad]
+    types = ['production', 'attraction', 'production']
+
+    exact_mat = np.zeros((3, len(models)))
+    approx_mat = np.zeros((3, len(models)))
+
+    for k, (pmat, constr) in enumerate(tqdm(zip(models, types), total=3)):
+        _, exact_counts = locs.significant_exact(
+            pmat, constr, return_counts=True)
+        exact_mat[:, k] = exact_counts
+        _, approx_counts = locs.significant_approx(
+            pmat, constr, return_counts=True)
+        approx_mat[:, k] = approx_counts
+
+    rows = ['Positive (observed larger)', 'Negative (model larger)',
+            'Not-significant:']
+    cols = ['', 'Grav. Prod.', 'Grav. Attr.', 'Rad.']
+
+    print('\nExact p-value')
+    tab = [[rows[k]] + exact_mat[k].tolist() for k in range(len(rows))]
+    print(tabulate(tab, headers=cols))
+
+    print('\nNormal approximation')
+    tab = [[rows[k]] + approx_mat[k].tolist() for k in range(len(rows))]
+    print(tabulate(tab, headers=cols))
+
     print('\n')  # two empty lines

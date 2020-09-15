@@ -365,6 +365,29 @@ class Locations(object):
 
         return p_mat
 
+    def draw_multinomial(self, p_mat, constraint_type, seed=0):
+        """Draw from the constrained model using multinomial distribution."""
+        assert constraint_type in ['production', 'attraction'], \
+            f'invalid constraint {constraint_type}'
+
+        rng = np.random.RandomState(seed)
+
+        out = sparse.lil_matrix((self.N, self.N), dtype=int)
+
+        if constraint_type == 'production':
+            for i in range(self.N):
+                draw = rng.multinomial(self.data_out[i], p_mat[i])
+                j, = draw.nonzero()
+                out[i, j] = draw[j]
+
+        elif constraint_type == 'attraction':
+            for j in range(self.N):
+                draw = rng.multinomial(self.data_in[j], p_mat[j])
+                i, = draw.nonzero()
+                out[i, j] = draw[i]
+
+        return out.tocsr()
+
     # def constrained_flux(self, f_mat: Array,
     #                      constraint_type: str) -> Array:
     #     """
@@ -500,71 +523,125 @@ class Locations(object):
     #
     #     return res.x
 
-    def significant_binomial(self, model: str,
-                             significance: float = 0.01,
-                             return_negative: bool = False,
-                             verbose: bool = False) -> Tuple[float, float]:
+    def significant_approx(self, pmat: Array,
+                           constraint_type: str,
+                           significance: float = 0.01,
+                           return_counts: bool = False,
+                           verbose: bool = False) -> Tuple[Array, Array]:
         """
-        Calculate the significant entries according to a production-constrained
-        binomial model.
+        Calculate the significant entries according to normal approximation.
 
         Parameters
         ----------
-        model : str
-            The model to use, either 'gravity' or 'radiation'.
+        pmat : Array
+        constraint_type : str
+            'production', or 'attraction'
         significance : float, optional
             By default 0.01.
-        return_negative : bool, optional
-            Whether to output the entries for which the model is significanly
-            larger than the observations (negative edges). The default is False,
-            and the method returns the entries for which the observations are
-            significantly larger (positive edges).
+        return_counts : bool, optional
+        verbos : bool, optional
 
         Returns
         -------
-        positive_edges : (np.array, np.array)
-            A tuple of positive edges. Alternatively if return_negative is set
-            to True, return a second tuple.
+        edges
 
         """
         if self.data is None:
             raise DataNotSet('the data for comparison is needed')
 
-        assert model in ['gravity', 'radiation'], f'invalid model {model}'
+        assert constraint_type in ['production', 'attraction'], \
+            f'invalid constraint {constraint_type}'
 
-        if model == 'gravity':
-            α, β, γ = self.gravity_calibrate_all(verbose=False)
-            f_mat = self.gravity_matrix(γ, α, β)
-            p_mat = self.probability_matrix(f_mat, 'production')
-        elif model == 'radiation':
-            p_mat = self.radiation_matrix(finite_correction=True)
+        # i, j = (Data > 0).multiply(np.round(Exp) >= 1.0).nonzero()
+        ii, jj = self.data.nonzero()
 
         # Entry-wise first and second moments (binomial model)
         Data = self.data
-        Exp = p_mat * self.data_out[:, np.newaxis]
-        Std = np.sqrt(Exp * (1 - p_mat))
+        if constraint_type == 'production':
+            Exp = self.data_out[:, np.newaxis] * pmat
+        elif constraint_type == 'attraction':
+            Exp = pmat * self.data_in[np.newaxis, :]
+        Std = np.sqrt(Exp * (1 - pmat))
 
-        i, j = (Data > 0).multiply(np.round(Exp) >= 1.0).nonzero()
-
-        Z_score = np.asarray((Data[i, j] - Exp[i, j]) / Std[i, j]).squeeze()
+        Z_score = np.asarray(
+            (Data[ii, jj] - Exp[ii, jj]) / Std[ii, jj]
+        ).flatten()
 
         idx_plus = stats.norm.cdf(-Z_score) < significance
         idx_minus = stats.norm.cdf(Z_score) < significance
-        # idx_zero = ~np.bitwise_or(idx_plus, idx_minus)
+        n, nplus, nminus = len(ii), np.sum(idx_plus), np.sum(idx_minus)
+        nzero = n - nplus - nminus
 
         if verbose:
-            n, nplus, nminus = len(i), np.sum(idx_plus), np.sum(idx_minus)
-            nzero = n - nplus - nminus
             tab = [['Positive (observed larger)', nplus, f'{100*nplus/n:.2f}'],
                    ['Negative (model larger)', nminus, f'{100*nminus/n:.2f}'],
                    ['Not-significant:', nzero, f'{100*nzero/n:.2f}'],
                    ['Total', n, '100.00']]
             print(tabulate(tab, headers=['', 'Nb', '%']))
 
-        plus = i[idx_plus], j[idx_plus]
-        minus = i[idx_minus], j[idx_minus]
+        p = ii[idx_plus], jj[idx_plus]
+        m = ii[idx_minus], jj[idx_minus]
+        return ((p, m), (nplus, nminus, nzero)) if return_counts else (p, m)
 
-        return (plus, minus) if return_negative else plus
+    def significant_exact(self, pmat: Array,
+                          constraint_type: str,
+                          significance: float = 0.01,
+                          return_counts: bool = False,
+                          verbose: bool = False) -> Tuple[Array, Array]:
+        """
+        Calculate the significant entries according to a binomial test.
+
+        Parameters
+        ----------
+        pmat : Array
+        constraint_type : str
+            'production' or 'attraction'
+        significance : float, optional
+            By default 0.01.
+        return_counts : bool, optional
+        verbose : bool, optional
+
+        Returns
+        -------
+        edges
+
+        """
+        if self.data is None:
+            raise DataNotSet('the data for comparison is needed')
+
+        assert constraint_type in ['production', 'attraction'], \
+            f'invalid constraint {constraint_type}'
+
+        ii, jj = self.data.nonzero()
+        n = len(ii)
+        pvals = np.zeros((n, 2))  # plus and minus tests
+
+        # The target N is either the row or the column sum
+        Ns = self.data_out[ii] \
+            if constraint_type == 'production' \
+            else self.data_in[jj]
+
+        for k in range(n):
+            i, j = ii[k], jj[k]
+            pvals[k] = binomial_pvalues(Ns[k], pmat[i, j], self.data[i, j])
+
+        significant = pvals < significance
+        idx_plus = significant[:, 0]
+        idx_minus = significant[:, 1]
+        nplus, nminus = np.sum(idx_plus), np.sum(idx_minus)
+        nzero = n - nplus - nminus
+
+        if verbose:
+            tab = [['Positive (observed larger)', nplus, f'{100*nplus/n:.2f}'],
+                   ['Negative (model larger)', nminus, f'{100*nminus/n:.2f}'],
+                   ['Not-significant:', nzero, f'{100*nzero/n:.2f}'],
+                   ['Total', n, '100.00']]
+            print(tabulate(tab, headers=['', 'Nb', '%']))
+
+        p = ii[idx_plus], jj[idx_plus]
+        m = ii[idx_minus], jj[idx_minus]
+
+        return ((p, m), (nplus, nminus, nzero)) if return_counts else (p, m)
 
 
 def binomial_pvalues(N: int, p: float, x: int) -> Tuple[float, float]:
@@ -583,21 +660,28 @@ def binomial_pvalues(N: int, p: float, x: int) -> Tuple[float, float]:
     float, float
 
     """
-    N, x = int(round(N)), int(round(x))
+    # N, x = int(N), int(x)
     B = stats.binom(N, p)
 
-    # Test below seems to be significantly slower
-    # if x < N*p:
-    #     probas = B.pmf(range(x+1)).cumsum()
-    #     out =  1 - probas[x-1], probas[x]
-    # else:
-    #     probas = B.pmf(range(N, x-1, -1)).cumsum()
-    #     out = probas[-1], 1 - probas[-2]
+    # It would be useful to assume x > 0; that case is generally covered
+    # when I call using T_data.nonzero(). The other limiting case is when
+    # x == N
+    if x == N:
+        out = p**N, 1.0
 
-    probas = B.pmf(range(x + 1)).cumsum()
-    out = 1 - round(probas[x - 1], 6), round(probas[x], 6)
-    # due to numerical errors I can get cumsum larger than 1 and this is why
-    # we need to use rounding
+    # Test below seems is slower (2m23 vs 1m35 for UK commuting data)
+    # elif x < N // 2:
+    #     probas = B.pmf(range(x + 1)).cumsum()
+    #     out = 1 - round(probas[x - 1], 6), round(probas[x], 6)
+    # else:
+    #     probas = B.pmf(range(N, x - 1, -1)).cumsum()
+    #     out = round(probas[-1], 6), 1 - round(probas[-2], 6)
+
+    else:
+        probas = B.pmf(range(x + 1)).cumsum()
+        out = 1 - round(probas[x - 1], 6), round(probas[x], 6)
+        # due to numerical errors I can get cumsum larger than 1 and this is why
+        # we need to use rounding
 
     return out
 
@@ -827,7 +911,7 @@ def _iterative_proportional_fit(f_mat: Array,
 
 
 class FailedToConverge(Exception):
-    """Raised when a iterative method failed to converge."""
+    """Raised when an iterative method failed to converge."""
 
     pass
 
@@ -863,6 +947,7 @@ def simple_ipf(mat: Array,
 
         out = a[:, np.newaxis] * mat * b[np.newaxis, :]
         bool_row = np.allclose(out.sum(axis=1), target_rows, atol=tol)
+        # rel_tol instead? this is the problem I address inside CPC, etc.
         bool_col = np.allclose(out.sum(axis=0), target_cols, atol=tol)
 
         niter += 1
