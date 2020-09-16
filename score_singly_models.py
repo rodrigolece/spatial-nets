@@ -1,4 +1,5 @@
 import os
+import pickle
 # import argparse
 import numpy as np
 from tabulate import tabulate
@@ -16,7 +17,7 @@ flow_file = os.path.join('data', 'UK_commute2011.npz')
 
 dmat_files = [
     os.path.join('data', x)
-    for x in ['UK_here_dmat.npz', 'UK_geodesic_dmat.mat']
+    for x in ['UK_geodesic_dmat.mat', 'UK_here_dmat.npz']
 ]
 
 print(f"\nReading flows from '{flow_file}'")
@@ -64,21 +65,32 @@ for dmat in dmat_files:
 
     # Calculate the number of significant edges
     models = [pmat_prod, pmat_attrac, pmat_rad]
+    names = ['gravity', 'gravity', 'radiation']
     types = ['production', 'attraction', 'production']
 
-    exact_mat = np.zeros((3, len(models)))
-    approx_mat = np.zeros((3, len(models)))
+    exact_mat = np.zeros((4, len(models)))
+    approx_mat = np.zeros((4, len(models)))
+
+    save_dict = dict()
 
     for k, (pmat, constr) in enumerate(tqdm(zip(models, types), total=3)):
-        _, exact_counts = locs.significant_exact(
-            pmat, constr, return_counts=True)
-        exact_mat[:, k] = exact_counts
-        _, approx_counts = locs.significant_approx(
-            pmat, constr, return_counts=True)
-        approx_mat[:, k] = approx_counts
+        exact_plus, exact_minus = locs.significant_exact(
+            pmat, constr, verbose=False)
+        n = len(exact_plus)
+        nplus, nminus = np.sum(exact_plus), np.sum(exact_minus)
+        exact_mat[:, k] = [nplus, nminus, n - nplus - nminus, n]
+
+        approx_plus, approx_minus = locs.significant_approx(
+            pmat, constr, verbose=False)
+        n = len(approx_plus)
+        nplus, nminus = np.sum(approx_plus), np.sum(approx_minus)
+        approx_mat[:, k] = [nplus, nminus, n - nplus - nminus, n]
+
+        save_dict[names[k], constr, 'exact'] = (exact_plus, exact_minus)
+        save_dict[names[k], constr, 'approx'] = (approx_plus, approx_minus)
 
     rows = ['Positive (observed larger)', 'Negative (model larger)',
-            'Not-significant:']
+            'Not-significant', 'Total']
     cols = ['', 'Grav. Prod.', 'Grav. Attr.', 'Rad.']
 
     print('\nExact p-value')
@@ -90,3 +102,12 @@ for dmat in dmat_files:
     print(tabulate(tab, headers=cols))
 
     print('\n')  # two empty lines
+
+# Save to file
+output_file = 'here_indices.pkl'
+
+print(f'Saving file: {output_file}')
+with open(output_file, 'wb') as f:
+    f.write(pickle.dumps(save_dict))
+
+print('\nDone!')

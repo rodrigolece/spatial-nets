@@ -526,7 +526,6 @@ class Locations(object):
     def significant_approx(self, pmat: Array,
                            constraint_type: str,
                            significance: float = 0.01,
-                           return_counts: bool = False,
                            verbose: bool = False) -> Tuple[Array, Array]:
         """
         Calculate the significant entries according to normal approximation.
@@ -538,8 +537,7 @@ class Locations(object):
             'production', or 'attraction'
         significance : float, optional
             By default 0.01.
-        return_counts : bool, optional
-        verbos : bool, optional
+        verbose : bool, optional
 
         Returns
         -------
@@ -569,24 +567,21 @@ class Locations(object):
 
         idx_plus = stats.norm.cdf(-Z_score) < significance
         idx_minus = stats.norm.cdf(Z_score) < significance
-        n, nplus, nminus = len(ii), np.sum(idx_plus), np.sum(idx_minus)
-        nzero = n - nplus - nminus
 
         if verbose:
+            n, nplus, nminus = len(ii), np.sum(idx_plus), np.sum(idx_minus)
+            nzero = n - nplus - nminus
             tab = [['Positive (observed larger)', nplus, f'{100*nplus/n:.2f}'],
                    ['Negative (model larger)', nminus, f'{100*nminus/n:.2f}'],
                    ['Not-significant:', nzero, f'{100*nzero/n:.2f}'],
                    ['Total', n, '100.00']]
             print(tabulate(tab, headers=['', 'Nb', '%']))
 
-        p = ii[idx_plus], jj[idx_plus]
-        m = ii[idx_minus], jj[idx_minus]
-        return ((p, m), (nplus, nminus, nzero)) if return_counts else (p, m)
+        return idx_plus, idx_minus
 
     def significant_exact(self, pmat: Array,
                           constraint_type: str,
                           significance: float = 0.01,
-                          return_counts: bool = False,
                           verbose: bool = False) -> Tuple[Array, Array]:
         """
         Calculate the significant entries according to a binomial test.
@@ -598,7 +593,6 @@ class Locations(object):
             'production' or 'attraction'
         significance : float, optional
             By default 0.01.
-        return_counts : bool, optional
         verbose : bool, optional
 
         Returns
@@ -628,20 +622,17 @@ class Locations(object):
         significant = pvals < significance
         idx_plus = significant[:, 0]
         idx_minus = significant[:, 1]
-        nplus, nminus = np.sum(idx_plus), np.sum(idx_minus)
-        nzero = n - nplus - nminus
 
         if verbose:
+            nplus, nminus = np.sum(idx_plus), np.sum(idx_minus)
+            nzero = n - nplus - nminus
             tab = [['Positive (observed larger)', nplus, f'{100*nplus/n:.2f}'],
                    ['Negative (model larger)', nminus, f'{100*nminus/n:.2f}'],
                    ['Not-significant:', nzero, f'{100*nzero/n:.2f}'],
                    ['Total', n, '100.00']]
             print(tabulate(tab, headers=['', 'Nb', '%']))
 
-        p = ii[idx_plus], jj[idx_plus]
-        m = ii[idx_minus], jj[idx_minus]
-
-        return ((p, m), (nplus, nminus, nzero)) if return_counts else (p, m)
+        return idx_plus, idx_minus
 
 
 def binomial_pvalues(N: int, p: float, x: int) -> Tuple[float, float]:
