@@ -523,25 +523,23 @@ class Locations(object):
     #
     #     return res.x
 
-    def significant_approx(self, pmat: Array,
-                           constraint_type: str,
-                           significance: float = 0.01,
-                           verbose: bool = False) -> Tuple[Array, Array]:
+    def pvalues_approx(self, pmat: Array, constraint_type: str) -> Array:
         """
-        Calculate the significant entries according to normal approximation.
+        Calculate the p-values using the normal approximation.
 
         Parameters
         ----------
         pmat : Array
-        constraint_type : str
-            'production', or 'attraction'
-        significance : float, optional
-            By default 0.01.
-        verbose : bool, optional
+        constraint_type : {'production', 'attraction'}
 
         Returns
         -------
-        edges
+        Array
+            A Mx2 array where M is the number of nonzero-edges. The first column
+            stores the p-values for the hypothesis "the observation is not
+            signifcantly larger than the predicted mean" and the second column
+            for the hypothesis "the observation is not signifcantly smaller than
+            the predicted mean."
 
         """
         if self.data is None:
@@ -550,7 +548,6 @@ class Locations(object):
         assert constraint_type in ['production', 'attraction'], \
             f'invalid constraint {constraint_type}'
 
-        # i, j = (Data > 0).multiply(np.round(Exp) >= 1.0).nonzero()
         ii, jj = self.data.nonzero()
 
         # Entry-wise first and second moments (binomial model)
@@ -561,43 +558,31 @@ class Locations(object):
             Exp = pmat * self.data_in[np.newaxis, :]
         Std = np.sqrt(Exp * (1 - pmat))
 
-        Z_score = np.asarray(
-            (Data[ii, jj] - Exp[ii, jj]) / Std[ii, jj]
-        ).flatten()
+        Z_score = (Data[ii, jj] - Exp[ii, jj]) / Std[ii, jj]
+        Z_score = np.asarray(Z_score).flatten()
 
-        idx_plus = stats.norm.cdf(-Z_score) < significance
-        idx_minus = stats.norm.cdf(Z_score) < significance
+        plus = stats.norm.cdf(-Z_score)
+        minus = stats.norm.cdf(Z_score)
 
-        if verbose:
-            n, nplus, nminus = len(ii), np.sum(idx_plus), np.sum(idx_minus)
-            nzero = n - nplus - nminus
-            tab = [['Positive (observed larger)', nplus, f'{100*nplus/n:.2f}'],
-                   ['Negative (model larger)', nminus, f'{100*nminus/n:.2f}'],
-                   ['Not-significant:', nzero, f'{100*nzero/n:.2f}'],
-                   ['Total', n, '100.00']]
-            print(tabulate(tab, headers=['', 'Nb', '%']))
+        return np.vstack((plus, minus)).T
 
-        return idx_plus, idx_minus
-
-    def significant_exact(self, pmat: Array,
-                          constraint_type: str,
-                          significance: float = 0.01,
-                          verbose: bool = False) -> Tuple[Array, Array]:
+    def pvalues_exact(self, pmat: Array, constraint_type: str) -> Array:
         """
-        Calculate the significant entries according to a binomial test.
+        Calculate the p-values using the exact binomial distributions.
 
         Parameters
         ----------
         pmat : Array
-        constraint_type : str
-            'production' or 'attraction'
-        significance : float, optional
-            By default 0.01.
-        verbose : bool, optional
+        constraint_type : {'production', 'attraction'}
 
         Returns
         -------
-        edges
+        Array
+            A Mx2 array where M is the number of nonzero-edges. The first column
+            stores the p-values for the hypothesis "the observation is not
+            signifcantly larger than the predicted mean" and the second column
+            for the hypothesis "the observation is not signifcantly smaller than
+            the predicted mean."
 
         """
         if self.data is None:
@@ -608,7 +593,7 @@ class Locations(object):
 
         ii, jj = self.data.nonzero()
         n = len(ii)
-        pvals = np.zeros((n, 2))  # plus and minus tests
+        out = np.zeros((n, 2))
 
         # The target N is either the row or the column sum
         Ns = self.data_out[ii] \
@@ -617,14 +602,44 @@ class Locations(object):
 
         for k in range(n):
             i, j = ii[k], jj[k]
-            pvals[k] = binomial_pvalues(Ns[k], pmat[i, j], self.data[i, j])
+            out[k] = _binomial_pvalues(Ns[k], pmat[i, j], self.data[i, j])
+
+        return out
+
+    def significant_edges(self, pmat: Array,
+                          constraint_type: str,
+                          significance: float = 0.01,
+                          exact: bool = False,
+                          verbose: bool = False) -> Tuple[Array, Array]:
+        """
+        Calculate the significant edges according to a binomial test (or z-test).
+
+        Parameters
+        ----------
+        pmat : Array
+        constraint_type : {'production', 'attraction'}
+        significance : float, optional
+            By default 0.01.
+        exact : bool, optional
+            Whether to use the exact calculation as opposed the normal
+            approximation (z-test). The default is False.
+        verbose : bool, optional
+
+        Returns
+        -------
+        edges
+
+        """
+        method_name = 'pvalues_' + ('exact' if exact else 'approx')
+        method = getattr(self, method_name)
+        pvals = method(pmat, constraint_type)
 
         significant = pvals < significance
         idx_plus = significant[:, 0]
         idx_minus = significant[:, 1]
 
         if verbose:
-            nplus, nminus = np.sum(idx_plus), np.sum(idx_minus)
+            n, nplus, nminus = len(pvals), np.sum(idx_plus), np.sum(idx_minus)
             nzero = n - nplus - nminus
             tab = [['Positive (observed larger)', nplus, f'{100*nplus/n:.2f}'],
                    ['Negative (model larger)', nminus, f'{100*nminus/n:.2f}'],
@@ -635,9 +650,37 @@ class Locations(object):
         return idx_plus, idx_minus
 
 
-def binomial_pvalues(N: int, p: float, x: int) -> Tuple[float, float]:
+class DataLocations(Locations):
+
+    def __init__(self, location_mat, data_mat):
+        N, _ = data_mat.shape
+        assert (data_mat < 0).sum() == 0, f'data matrix should be non-negative'
+        assert data_mat.shape == (N, N), 'data_mat is not NxN'
+
+        # NB: We remove the diagonal from the data matrix BEFORE calculating
+        # outflow and inflow
+        if sparse.issparse(data_mat):
+            input_mat = utils.sparsemat_remove_diag(data_mat)  # creates a copy
+        else:
+            input_mat = data_mat.copy()
+            input_mat[np.diag_indices(N)] = 0
+
+        # Row and column sums for dense and sparse matrices
+        outflow = np.asarray(input_mat.sum(axis=1)).flatten()
+        inflow = np.asarray(input_mat.sum(axis=0)).flatten()
+
+        coords = True if location_mat.shape == (N, 2) else False
+        super().__init__(N, location_mat, outflow,
+                         inflow, use_coords=coords)
+        self.data = data_mat
+
+        return None
+
+
+# Outside the classes
+def _binomial_pvalues(N: int, p: float, x: int) -> Tuple[float, float]:
     """
-    Calculate the p-values according to the binomial model.
+    Calculate a p-value according to the binomial distribution.
 
     Parameters
     ----------
@@ -675,33 +718,6 @@ def binomial_pvalues(N: int, p: float, x: int) -> Tuple[float, float]:
         # we need to use rounding
 
     return out
-
-
-class DataLocations(Locations):
-
-    def __init__(self, location_mat, data_mat):
-        N, _ = data_mat.shape
-        assert (data_mat < 0).sum() == 0, f'data matrix should be non-negative'
-        assert data_mat.shape == (N, N), 'data_mat is not NxN'
-
-        # NB: We remove the diagonal from the data matrix BEFORE calculating
-        # outflow and inflow
-        if sparse.issparse(data_mat):
-            input_mat = utils.sparsemat_remove_diag(data_mat)  # creates a copy
-        else:
-            input_mat = data_mat.copy()
-            input_mat[np.diag_indices(N)] = 0
-
-        # Row and column sums for dense and sparse matrices
-        outflow = np.asarray(input_mat.sum(axis=1)).flatten()
-        inflow = np.asarray(input_mat.sum(axis=0)).flatten()
-
-        coords = True if location_mat.shape == (N, 2) else False
-        super().__init__(N, location_mat, outflow,
-                         inflow, use_coords=coords)
-        self.data = data_mat
-
-        return None
 
 
 def CPC(F1: Array, F2: Array, rel_tol: float = 1e-3) -> float:
