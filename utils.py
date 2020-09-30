@@ -5,6 +5,8 @@ from scipy import sparse
 from scipy.io import loadmat
 from typing import List
 
+import graph_tool as gt
+
 from sklearn.metrics import pairwise
 
 import matplotlib.pyplot as plt
@@ -34,6 +36,42 @@ default_clrs = [(0.5529411764705883, 0.8274509803921568, 0.7803921568627451, 1.0
 
 default_cm = colors.LinearSegmentedColormap.from_list(
     'graphtool-Set3', default_clrs)
+
+
+def build_graph(mat, idx, coords=None, vertex_properties={}):
+    """Build a Graph from a given mat and a subset of the nonzero entries."""
+    nb_nodes, _ = mat.shape
+
+    ii, jj = mat.nonzero()
+    nb_edges = len(ii[idx])
+
+    data = np.ones(nb_edges, dtype=int)
+    A = sparse.csr_matrix((data, (ii[idx], jj[idx])), shape=mat.shape)
+
+    G = gt.Graph(directed=True)
+    G.add_vertex(nb_nodes)
+    G.add_edge_list(np.transpose(A.nonzero()))
+
+    if coords is not None:
+        pos = G.new_vertex_property('vector<double>')
+        cairo = coords.T * [[1], [-1]]
+        pos.set_2d_array(cairo)  # cairo's origin is top left and y increases downwards
+        G.vertex_properties['pos'] = pos
+
+    for name, vals in vertex_properties.items():
+        if isinstance(vals[0], str):
+            value_type = 'string'
+        elif isinstance(vals[0], (np.floating, float)):
+            value_type = 'float'
+        elif isinstance(vals[0], (np.integer, int)):
+            value_type = 'int'
+        else:
+            raise Exception('vertex_property type is not supported')
+
+        vp = G.new_vertex_property(value_type, vals=vals)
+        G.vertex_properties[name] = vp
+
+    return G
 
 
 def gt_color_legend(state, legendsize=(6, 0.35), cmap=default_cm):
