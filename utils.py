@@ -38,17 +38,22 @@ default_cm = colors.LinearSegmentedColormap.from_list(
     'graphtool-Set3', default_clrs)
 
 
-def build_graph(mat, idx, coords=None, vertex_properties={}):
+def build_graph(mat, idx=None, directed=True, coords=None, vertex_properties={}):
     """Build a Graph from a given mat and a subset of the nonzero entries."""
     nb_nodes, _ = mat.shape
 
-    ii, jj = mat.nonzero()
-    nb_edges = len(ii[idx])
+    i, j = mat.nonzero()
+    if idx is not None:
+        ii, jj = i[idx], j[idx]
+    else:
+        ii, jj = i, j
+
+    nb_edges = len(ii)
 
     data = np.ones(nb_edges, dtype=int)
-    A = sparse.csr_matrix((data, (ii[idx], jj[idx])), shape=mat.shape)
+    A = sparse.csr_matrix((data, (ii, jj)), shape=mat.shape)
 
-    G = gt.Graph(directed=True)
+    G = gt.Graph(directed=directed)
     G.add_vertex(nb_nodes)
     G.add_edge_list(np.transpose(A.nonzero()))
 
