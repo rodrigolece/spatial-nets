@@ -47,6 +47,9 @@ def build_graph(mat, idx=None, directed=True, coords=None, vertex_properties={})
         ii, jj = i[idx], j[idx]
     else:
         ii, jj = i, j
+    if not directed:
+        pos = ii < jj
+        ii, jj = ii[pos], jj[pos]
 
     nb_edges = len(ii)
 
@@ -60,7 +63,44 @@ def build_graph(mat, idx=None, directed=True, coords=None, vertex_properties={})
     if coords is not None:
         pos = G.new_vertex_property('vector<double>')
         cairo = coords.T * [[1], [-1]]
-        pos.set_2d_array(cairo)  # cairo's origin is top left and y increases downwards
+        # cairo's origin is top left and y increases downwards
+        pos.set_2d_array(cairo)
+        G.vertex_properties['pos'] = pos
+
+    for name, vals in vertex_properties.items():
+        if isinstance(vals[0], str):
+            value_type = 'string'
+        elif isinstance(vals[0], (np.floating, float)):
+            value_type = 'float'
+        elif isinstance(vals[0], (np.integer, int)):
+            value_type = 'int'
+        else:
+            raise Exception('vertex_property type is not supported')
+
+        vp = G.new_vertex_property(value_type, vals=vals)
+        G.vertex_properties[name] = vp
+
+    return G
+
+
+def build_weighted_graph(coo_mat, directed=False, coords=None, vertex_properties={}):
+    """Build a weigthed Graph from COO sparse matrix."""
+    assert sparse.isspmatrix_coo(coo_mat), 'error: wrong matrix type'
+
+    nb_nodes, _ = coo_mat.shape
+    G = gt.Graph(directed=directed)
+    G.add_vertex(nb_nodes)
+
+    weight = G.new_edge_property('int')
+    edge_list = zip(coo_mat.row, coo_mat.col, coo_mat.data)
+    G.add_edge_list(edge_list, eprops=[weight])
+    G.edge_properties['weight'] = weight
+
+    if coords is not None:
+        pos = G.new_vertex_property('vector<double>')
+        cairo = coords.T * [[1], [-1]]
+        # cairo's origin is top left and y increases downwards
+        pos.set_2d_array(cairo)
         G.vertex_properties['pos'] = pos
 
     for name, vals in vertex_properties.items():
@@ -157,10 +197,10 @@ def sparsemat_remove_diag(spmat):
 #     return df
 
 
-def benchmark_cerina(nb_nodes, edge_density, l, beta, epsilon, L=1.0, seed=0, verbose=False):
+def benchmark_cerina(nb_nodes, edge_density, l, beta, epsilon, L=1.0, seed=0):
     """Create a benchmark network of the type proposed by Cerina et al."""
     N = nb_nodes
-    nb_edges = nb_nodes * (nb_nodes - 1) * edge_density / 2
+    nb_edges = N * (N - 1) * edge_density // 2
 
     rng = np.random.RandomState(seed)
 
@@ -168,7 +208,7 @@ def benchmark_cerina(nb_nodes, edge_density, l, beta, epsilon, L=1.0, seed=0, ve
     ds = rng.exponential(scale=l, size=N)
     alphas = 2 * np.pi * rng.rand(N)
     shift = L * np.ones(N)
-    shift[nb_nodes // 2 + 1:] *= -1
+    shift[N // 2 + 1:] *= -1
 
     xs = ds * np.cos(alphas) + shift
     ys = ds * np.sin(alphas)
@@ -187,18 +227,17 @@ def benchmark_cerina(nb_nodes, edge_density, l, beta, epsilon, L=1.0, seed=0, ve
     # Edge selection
     smat = comm_vec.T * comm_vec
     dmat = pairwise.euclidean_distances(coords)
-    pmat = np.triu(np.exp(beta * smat - dmat / l), k=1)  # keep i < j
+    pmat = np.exp(beta * smat - dmat / l)
 
-    i, j = np.nonzero(pmat)
+    i, j = np.triu_indices_from(pmat, k=1)  # keep i < j
     probas = pmat[i, j]
-    probas *= nb_edges / np.sum(probas)  # normalization
+    probas /= probas.sum()  # normalization
 
-    idx_edges = rng.rand(len(probas)) < probas
+    draw = rng.multinomial(nb_edges, probas)
+    idx, = draw.nonzero()
+    mat = sparse.coo_matrix((draw[idx], (i[idx], j[idx])), shape=(N, N))
 
-    if verbose:
-        print(f'Nb of edges: {np.sum(idx_edges)}')
-
-    return coords, np.squeeze(comm_vec), (i[idx_edges], j[idx_edges])
+    return coords, np.squeeze(comm_vec), mat
 
 
 def greatcircle_distance(long1, lat1, long2, lat2, R=6371):
@@ -218,7 +257,8 @@ def greatcircle_distance(long1, lat1, long2, lat2, R=6371):
     Dphi = phi1 - phi2  # abs value not needed because of sin squared
     Dlambda = lambda1 - lambda2
 
-    radical = np.sin(Dphi / 2)**2 + np.cos(phi1) * np.cos(phi2) * np.sin(Dlambda / 2)**2
+    radical = np.sin(Dphi / 2)**2 + np.cos(phi1) * \
+        np.cos(phi2) * np.sin(Dlambda / 2)**2
 
     return R * 2 * np.arcsin(np.sqrt(radical))
 
