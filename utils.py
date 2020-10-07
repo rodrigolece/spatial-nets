@@ -240,6 +240,38 @@ def benchmark_cerina(nb_nodes, edge_density, l, beta, epsilon, L=1.0, seed=0):
     return coords, np.squeeze(comm_vec), mat
 
 
+def benchmark_expert(nb_nodes, edge_density, lamb, L=100.0, seed=0):
+    """Create a benchmark network of the type proposed by Expert et al."""
+    N = nb_nodes
+    nb_edges = N * (N - 1) * edge_density // 2
+
+    rng = np.random.RandomState(seed)
+
+    # Coordinates
+    coords = L * rng.rand(N, 2)
+
+    # Attibute assignment
+    comm_vec = np.ones(N, dtype=int)
+    comm_vec[N // 2:] *= -1
+
+    # Edge selection
+    smat = (comm_vec * comm_vec[:, np.newaxis]).astype(float)
+    # smat[smat == 1] = 1
+    smat[smat == -1] = lamb
+
+    dmat = pairwise.euclidean_distances(coords)
+
+    i, j = np.triu_indices_from(smat, k=1)  # keep i < j
+    probas = smat[i, j] / dmat[i, j]
+    probas /= probas.sum()  # normalization
+
+    draw = rng.multinomial(nb_edges, probas)
+    idx, = draw.nonzero()
+    mat = sp.coo_matrix((draw[idx], (i[idx], j[idx])), shape=(N, N))
+
+    return coords, np.squeeze(comm_vec), mat
+
+
 def greatcircle_distance(long1, lat1, long2, lat2, R=6371):
     """Calculate the great-circle distance between pais of points.
 
