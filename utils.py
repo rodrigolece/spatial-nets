@@ -1,7 +1,7 @@
 import warnings
 import numpy as np
 import pandas as pd
-from scipy import sparse
+import scipy.sparse as sp
 from scipy.io import loadmat
 from typing import List
 
@@ -54,7 +54,7 @@ def build_graph(mat, idx=None, directed=True, coords=None, vertex_properties={})
     nb_edges = len(ii)
 
     data = np.ones(nb_edges, dtype=int)
-    A = sparse.csr_matrix((data, (ii, jj)), shape=mat.shape)
+    A = sp.csr_matrix((data, (ii, jj)), shape=mat.shape)
 
     G = gt.Graph(directed=directed)
     G.add_vertex(nb_nodes)
@@ -85,7 +85,7 @@ def build_graph(mat, idx=None, directed=True, coords=None, vertex_properties={})
 
 def build_weighted_graph(coo_mat, directed=False, coords=None, vertex_properties={}):
     """Build a weigthed Graph from COO sparse matrix."""
-    assert sparse.isspmatrix_coo(coo_mat), 'error: wrong matrix type'
+    assert sp.isspmatrix_coo(coo_mat), 'error: wrong matrix type'
 
     nb_nodes, _ = coo_mat.shape
     G = gt.Graph(directed=directed)
@@ -141,7 +141,7 @@ def sparsemat_from_flow(flow_df, return_ids=False):
     data = flow_df.flow
     n = len(ids)
 
-    mat = sparse.csr_matrix((data, (idx_i, idx_j)), shape=(n, n))
+    mat = sp.csr_matrix((data, (idx_i, idx_j)), shape=(n, n))
 
     return mat, ids if return_ids else mat
 
@@ -208,7 +208,7 @@ def benchmark_cerina(nb_nodes, edge_density, l, beta, epsilon, L=1.0, seed=0):
     ds = rng.exponential(scale=l, size=N)
     alphas = 2 * np.pi * rng.rand(N)
     shift = L * np.ones(N)
-    shift[N // 2 + 1:] *= -1
+    shift[N // 2:] *= -1
 
     xs = ds * np.cos(alphas) + shift
     ys = ds * np.sin(alphas)
@@ -235,7 +235,7 @@ def benchmark_cerina(nb_nodes, edge_density, l, beta, epsilon, L=1.0, seed=0):
 
     draw = rng.multinomial(nb_edges, probas)
     idx, = draw.nonzero()
-    mat = sparse.coo_matrix((draw[idx], (i[idx], j[idx])), shape=(N, N))
+    mat = sp.coo_matrix((draw[idx], (i[idx], j[idx])), shape=(N, N))
 
     return coords, np.squeeze(comm_vec), mat
 
@@ -281,7 +281,7 @@ def load_dmat(file: str, exclude_positions: List[int] = None):
     assert file.endswith(('.mat', '.npz')), 'supported formats are .mat and .npz'
     format = file[-3:]
 
-    dmat = loadmat(file)['dmat'] if format == 'mat' else sparse.load_npz(file)
+    dmat = loadmat(file)['dmat'] if format == 'mat' else sp.load_npz(file)
 
     m, n = dmat.shape
     assert m == n, 'matrix should be square'
@@ -295,7 +295,7 @@ def load_dmat(file: str, exclude_positions: List[int] = None):
         # TODO: default to upper triangular matrix in the other functions
         dmat = dmat + dmat.T
 
-    if sparse.issparse(dmat):
+    if sp.issparse(dmat):
         # sparse matrices are incompativle with masked arrays (io_matrix)
         dmat = np.asarray(dmat.todense())
 
@@ -319,7 +319,7 @@ def load_flows(file: str, zero_diag: bool = True):
 
     Returns
     -------
-    sparse.csr.csr_matrix
+    sp.csr.csr_matrix
 
     """
     assert file.endswith(('.npz', '.csv', 'adj')), \
@@ -327,7 +327,7 @@ def load_flows(file: str, zero_diag: bool = True):
     format = file[-3:]
 
     if format == 'npz':
-        out = sparse.load_npz(file)
+        out = sp.load_npz(file)
 
     elif format in ('csv', 'adj'):
         df = pd.read_csv(file, header=0)
