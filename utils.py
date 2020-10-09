@@ -240,7 +240,7 @@ def benchmark_cerina(nb_nodes, edge_density, l, beta, epsilon, L=1.0, seed=0):
     return coords, np.squeeze(comm_vec), mat
 
 
-def benchmark_expert(nb_nodes, edge_density, lamb, L=100.0, seed=0):
+def benchmark_expert(nb_nodes, edge_density, lamb, gamma=2, L=100.0, seed=0):
     """Create a benchmark network of the type proposed by Expert et al."""
     N = nb_nodes
     nb_edges = N * (N - 1) * edge_density // 2
@@ -262,7 +262,7 @@ def benchmark_expert(nb_nodes, edge_density, lamb, L=100.0, seed=0):
     dmat = pairwise.euclidean_distances(coords)
 
     i, j = np.triu_indices_from(smat, k=1)  # keep i < j
-    probas = smat[i, j] / dmat[i, j]
+    probas = smat[i, j] / (dmat[i, j]**gamma)
     probas /= probas.sum()  # normalization
 
     draw = rng.multinomial(nb_edges, probas)
