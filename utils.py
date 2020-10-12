@@ -295,6 +295,15 @@ def greatcircle_distance(long1, lat1, long2, lat2, R=6371):
     return R * 2 * np.arcsin(np.sqrt(radical))
 
 
+def project_mercator(longlat, R=6371):
+    """Project longitude and latitute to Mercator."""
+    rad = np.radians(longlat)  # lambda, phi
+    x = R * rad[:,0]
+    y = R * np.log(np.tan(np.pi/4 + rad[:,1]/2))
+
+    return np.vstack((x, y)).T
+
+
 def load_dmat(file: str, exclude_positions: List[int] = None):
     """
     Read distance matrix from file.
