@@ -1,7 +1,7 @@
 import warnings
 import numpy as np
 import numpy.ma as ma
-from scipy import stats, sparse  # optimize
+from scipy import stats, sparse, optimize
 from sklearn import linear_model
 from sklearn.metrics import pairwise
 import textwrap
@@ -276,6 +276,62 @@ class Locations(object):
 
         return out
 
+    def gravity_calibrate_nonlinear(self, constraint_type: str = 'production',
+                                    verbose: bool = False) -> Tuple[float, float]:
+        """
+        Calibrate the gravity model using nonlinear least squares.
+
+        Parameters
+        ----------
+        constraint_type : str, optional
+
+        Returns
+        -------
+        float, float
+
+        """
+        if self.data is None:
+            raise DataNotSet('the data for comparison is needed')
+
+        assert constraint_type in ['production', 'attraction'], \
+            f'invalid constraint {constraint_type}'
+
+        # The observations
+        i, j = self.data.nonzero()
+        y = np.asarray(self.data[i, j]).flatten()
+
+        if constraint_type == 'production':
+            def cost_fun(x):  # gamma, beta
+                fmat = self.gravity_matrix(x[0], β=x[1])
+                pmat = self.probability_matrix(fmat, constraint_type)
+                T_model = self.data_out[:, np.newaxis] * pmat
+                return y - T_model[i, j]
+
+        elif constraint_type == 'attraction':
+            def cost_fun(x):  # gamma, alpha
+                fmat = self.gravity_matrix(x[0], α=x[1])
+                pmat = self.probability_matrix(fmat, constraint_type)
+                T_model = pmat * self.data_in[np.newaxis, :]
+                return y - T_model[i, j]
+
+        res = optimize.least_squares(cost_fun, [1, 1])
+        st = res.status
+        assert st > 0, f'optimization exit status is failure'
+
+        st_dict = {
+            -1: 'improper input parameters status returned from MINPACK.',
+            0: 'the maximum number of function evaluations is exceeded.',
+            1: 'gtol termination condition is satisfied.',
+            2: 'ftol termination condition is satisfied.',
+            3: 'xtol termination condition is satisfied.',
+            4: 'Both ftol and xtol termination conditions are satisfied.'
+        }
+
+        if verbose:
+            print('Status: ', st_dict[st])
+
+        return res.x
+
     def gravity_calibrate_all(self, verbose: bool = False) -> Tuple[float, float, float]:
         """
         Calibrate the all of the gravity parameters using linear least squares.
@@ -494,34 +550,6 @@ class Locations(object):
     #     Data = self.data
     #     return CPC(Data, self.constrained_model(model, constraint_type, params))
     #
-    # def gravity_calibrate_gamma(self, constraint_type: str = 'production',
-    #                             bounds: Tuple[float, float] = (1e-3, 3)) -> float:
-    #     """
-    #     Calibrate the gravity power law parameter by maximising the CPC metric.
-    #
-    #     Parameters
-    #     ----------
-    #     constraint_type : str, optional
-    #     bounds : tuple, optional
-    #         Default is (1e-3, 3).
-    #
-    #     Returns
-    #     -------
-    #     float
-    #
-    #     """
-    #     if self.data is None:
-    #         raise DataNotSet('the data for comparison is needed')
-    #
-    #     res = optimize.minimize_scalar(
-    #         lambda x: -self.CPC_from_model('gravity', constraint_type, dict(γ=x)),
-    #         method='Bounded',
-    #         bounds=bounds
-    #     )
-    #     st = res.status
-    #     assert st == 0, f'optimization exit status is non-zero: {st}'
-    #
-    #     return res.x
 
     def pvalues_approx(self, pmat: Array, constraint_type: str) -> Array:
         """
