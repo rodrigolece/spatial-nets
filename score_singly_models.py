@@ -1,5 +1,5 @@
 import os
-import pickle
+# import pickle
 import argparse
 import numpy as np
 from tabulate import tabulate
@@ -23,7 +23,8 @@ args = parser.parse_args()
 sig = args.significance
 output_file = args.output
 if output_file:
-    assert output_file.endswith('.pkl'),  "invalid file extension; use '.pkl'"
+    # assert output_file.endswith('.pkl'),  "invalid file extension; use '.pkl'"
+    assert output_file.endswith('.npz'),  "invalid file extension; use '.npz'"
 
 flow_file = os.path.join('data', 'UK_commute2011.npz')
 
@@ -47,13 +48,15 @@ for dmat in dmat_files:
 
     locs = DataLocations(dmat, T_data)
 
-    # Gravity model
-    α, β, γ = locs.gravity_calibrate_all(verbose=False)
-    fmat = locs.gravity_matrix(**{'γ': γ, 'α': α, 'β': β})
-
+    # Gravity model: production
+    γ, β = locs.gravity_calibrate_nonlinear(constraint_type='production')
+    fmat = locs.gravity_matrix(**{'γ': γ, 'β': β})
     pmat_prod = locs.probability_matrix(fmat, 'production')
     T_prod = locs.orig_rel[:, np.newaxis] * pmat_prod
 
+    # Gravity model: attraction
+    γ, α = locs.gravity_calibrate_nonlinear(constraint_type='attraction')
+    fmat = locs.gravity_matrix(**{'γ': γ, 'α': α})
     pmat_attrac = locs.probability_matrix(fmat, 'attraction')
     T_attrac = pmat_attrac * locs.dest_rel[np.newaxis, :]
 
@@ -85,22 +88,33 @@ for dmat in dmat_files:
 
     save_dict = dict()
 
-    for k, (pmat, constr) in enumerate(tqdm(zip(models, types), total=3)):
+    for k, (pmat, constr) in enumerate(tqdm(zip(models, types), total=len(names))):
         if args.exact:
-            exact_plus, exact_minus = locs.significant_edges(
-                pmat, constr, significance=sig, exact=True, verbose=False)
+            # exact_plus, exact_minus = locs.significant_edges(
+            #     pmat, constr, significance=sig, exact=True, verbose=False)
+            pvals = locs.pvalues_exact(pmat, constraint_type=constr)
+            significant = pvals < sig
+            exact_plus, exact_minus = significant[:, 0], significant[:, 1]
+
             n = len(exact_plus)
             nplus, nminus = np.sum(exact_plus), np.sum(exact_minus)
             exact_mat[:, k] = [nplus, nminus, n - nplus - nminus, n]
-            save_dict[names[k], constr, 'exact'] = (exact_plus, exact_minus)
 
-        approx_plus, approx_minus = locs.significant_edges(
-            pmat, constr, significance=sig, exact=False, verbose=False)
+            name = f'{names[k]}_{constr}_exact'
+            save_dict[name] = pvals.copy()  # copy maybe not needed
+
+        # approx_plus, approx_minus = locs.significant_edges(
+        #     pmat, constr, significance=sig, exact=False, verbose=False)
+        pvals = locs.pvalues_approx(pmat, constraint_type=constr)
+        significant = pvals < sig
+        approx_plus, approx_minus = significant[:, 0], significant[:, 1]
+
         n = len(approx_plus)
         nplus, nminus = np.sum(approx_plus), np.sum(approx_minus)
         approx_mat[:, k] = [nplus, nminus, n - nplus - nminus, n]
 
-        save_dict[names[k], constr, 'approx'] = (approx_plus, approx_minus)
+        name = f'{names[k]}_{constr}_approx'
+        save_dict[name] = pvals.copy()  # copy maybe not needed
 
     rows = ['Positive (observed larger)', 'Negative (model larger)',
             'Not-significant', 'Total']
@@ -122,7 +136,8 @@ for dmat in dmat_files:
 
 if output_file:
     print(f'Saving file: {output_file}')
-    with open(output_file, 'wb') as f:
-        f.write(pickle.dumps(save_dict))
+    np.savez(output_file, **save_dict)
+    # with open(output_file, 'wb') as f:
+    #     f.write(pickle.dumps(save_dict))
 
 print('\nDone!')
