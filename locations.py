@@ -293,7 +293,7 @@ class Locations(object):
         if self.data is None:
             raise DataNotSet('the data for comparison is needed')
 
-        assert constraint_type in ['production', 'attraction'], \
+        assert constraint_type in ['production', 'attraction', 'doubly'], \
             f'invalid constraint {constraint_type}'
 
         # The observations
@@ -301,6 +301,7 @@ class Locations(object):
         y = np.asarray(self.data[i, j]).flatten()
 
         if constraint_type == 'production':
+            x0 = [1, 1]
             def cost_fun(x):  # gamma, beta
                 fmat = self.gravity_matrix(x[0], β=x[1])
                 pmat = self.probability_matrix(fmat, constraint_type)
@@ -308,13 +309,23 @@ class Locations(object):
                 return y - T_model[i, j]
 
         elif constraint_type == 'attraction':
+            x0 = [1, 1]
             def cost_fun(x):  # gamma, alpha
                 fmat = self.gravity_matrix(x[0], α=x[1])
                 pmat = self.probability_matrix(fmat, constraint_type)
                 T_model = pmat * self.data_in[np.newaxis, :]
                 return y - T_model[i, j]
 
-        res = optimize.least_squares(cost_fun, [1, 1])
+        elif constraint_type == 'doubly':
+            x0 = [2]
+            def cost_fun(x):  # gamma
+                fmat = self.gravity_matrix(x[0])
+                T_model = simple_ipf(fmat, self.data_out, self.data_in,
+                                     maxiters=200,
+                                     verbose=verbose)
+                return y - T_model[i, j]
+
+        res = optimize.least_squares(cost_fun, x0)
         st = res.status
         assert st > 0, f'optimization exit status is failure'
 
@@ -962,7 +973,8 @@ def simple_ipf(mat: Array,
                target_cols: Array = None,
                return_vecs: bool = False,
                tol: float = 1e-3,
-               maxiters: int = 100) -> Array:
+               maxiters: int = 100,
+               verbose: bool = False) -> Array:
     N, _ = mat.shape
     b = np.ones(N)
 
@@ -990,6 +1002,7 @@ def simple_ipf(mat: Array,
         if bool_row and bool_col:
             break
 
-    print(f'Nb iters until convergence: {niter}')
+    if verbose:
+        print(f'Nb iters until convergence: {niter}')
 
     return (out, a, b) if return_vecs else out

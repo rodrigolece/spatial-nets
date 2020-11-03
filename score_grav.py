@@ -48,23 +48,33 @@ for dmat in dmat_files:
 
     locs = DataLocations(dmat, T_data)
 
-    # Gravity model: production
+    # Gravity: unconstrained
+    α, β, γ = locs.gravity_calibrate_all()
+    fmat = locs.gravity_matrix(**{'γ': γ, 'α': α, 'β': β})
+    K = locs.data.sum() / fmat.sum()
+    T_unc = K * fmat
+
+    # Gravity: production
     γ, β = locs.gravity_calibrate_nonlinear(constraint_type='production')
     fmat = locs.gravity_matrix(**{'γ': γ, 'β': β})
     pmat_prod = locs.probability_matrix(fmat, 'production')
     T_prod = locs.orig_rel[:, np.newaxis] * pmat_prod
 
-    # Gravity model: attraction
+    # Gravity: attraction
     γ, α = locs.gravity_calibrate_nonlinear(constraint_type='attraction')
     fmat = locs.gravity_matrix(**{'γ': γ, 'α': α})
     pmat_attrac = locs.probability_matrix(fmat, 'attraction')
     T_attrac = pmat_attrac * locs.dest_rel[np.newaxis, :]
 
-    # Radiation model
-    pmat_rad = locs.radiation_matrix(finite_correction=True)
-    T_rad = locs.orig_rel[:, np.newaxis] * pmat_rad
+    # Gravity: doubly
+    γ = locs.gravity_calibrate_nonlinear(constraint_type='doubly')
+    fmat = locs.gravity_matrix(γ)
+    T_doubly = simple_ipf(fmat, locs.data_out, locs.data_in,
+                          maxiters=500, verbose=True)
+    pmat_doubly_prod = locs.probability_matrix(T_doubly, 'production')
+    pmat_doubly_attrac = locs.probability_matrix(T_doubly, 'attraction')
 
-    models = [T_prod, T_attrac, T_rad]
+    models = [T_unc, T_prod, T_attrac, T_doubly]
 
     cpc = [CPC(T_data, model) for model in models]
     cpl = [CPL(T_data, model) for model in models]
@@ -72,16 +82,16 @@ for dmat in dmat_files:
     results = np.array([cpc, cpl, rms])
 
     rows = ['CPC', 'CPL', 'NMRSE']
-    cols = ['', 'Grav. Prod.', 'Grav. Attr.', 'Rad.']
+    cols = ['', 'Grav. Unc.', 'Grav. Prod.', 'Grav. Attr.', 'Grav. Doubly']
     tab = [[rows[i]] + results[i].tolist() for i in range(len(rows))]
 
     print(tabulate(tab, headers=cols, floatfmt='.3f'))
     print()
 
     # Calculate the number of significant edges
-    models = [pmat_prod, pmat_attrac, pmat_rad]
-    names = ['gravity', 'gravity', 'radiation']
-    types = ['production', 'attraction', 'production']
+    models = [pmat_prod, pmat_attrac, pmat_doubly_prod, pmat_doubly_attrac]
+    names = ['gravity', 'gravity', 'grav-doubly-p', 'grav-doubly-a']
+    types = ['production', 'attraction', 'production', 'attraction']
 
     exact_mat = np.zeros((4, len(models)))
     approx_mat = np.zeros((4, len(models)))
@@ -118,7 +128,7 @@ for dmat in dmat_files:
 
     rows = ['Positive (observed larger)', 'Negative (model larger)',
             'Not-significant', 'Total']
-    cols = ['', 'Grav. Prod.', 'Grav. Attr.', 'Rad.']
+    cols = ['', 'Grav. Prod.', 'Grav. Attr.', 'Grav. Dp', 'Grav. Da']
 
     if args.exact:
         print('\nExact p-value')
@@ -140,4 +150,4 @@ if output_file:
     # with open(output_file, 'wb') as f:
     #     f.write(pickle.dumps(save_dict))
 
-print('\nDone!')
+print('\nDone!\n')
