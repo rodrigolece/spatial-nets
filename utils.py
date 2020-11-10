@@ -143,7 +143,7 @@ def sparsemat_from_flow(flow_df, return_ids=False):
 
     mat = sp.csr_matrix((data, (idx_i, idx_j)), shape=(n, n))
 
-    return mat, ids if return_ids else mat
+    return (mat, ids) if return_ids else mat
 
 
 def sparsemat_remove_diag(spmat):
