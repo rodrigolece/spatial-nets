@@ -123,8 +123,8 @@ for dmat in dmat_files:
         nplus, nminus = np.sum(approx_plus), np.sum(approx_minus)
         approx_mat[:, k] = [nplus, nminus, n - nplus - nminus, n]
 
-        name = f'{names[k]}_{constr}_approx'
-        save_dict[name] = pvals.copy()  # copy maybe not needed
+        # name = f'{names[k]}_{constr}_approx'
+        # save_dict[name] = pvals.copy()  # copy maybe not needed
 
     rows = ['Positive (observed larger)', 'Negative (model larger)',
             'Not-significant', 'Total']
