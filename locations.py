@@ -449,11 +449,21 @@ class Locations(object):
 
         elif constraint_type == 'attraction':
             for j in range(self.N):
-                draw = rng.multinomial(self.data_in[j], p_mat[j])
+                draw = rng.multinomial(self.data_in[j], p_mat[:, j])
                 i, = draw.nonzero()
                 out[i, j] = draw[i]
 
         return out.tocsr()
+
+    def score_draws(self, pmat, constraint_type, nb_repeats=20):
+        """Calculate goodness-of-fit measures for multiple draws."""
+        out = np.zeros((nb_repeats, 3))
+
+        for k in range(nb_repeats):
+            T = self.draw_multinomial(pmat, constraint_type, seed=k)
+            out[k] = CPC(T, self.data), CPL(T, self.data), NRMSE(T, self.data)
+
+        return out
 
     # def constrained_flux(self, f_mat: Array,
     #                      constraint_type: str) -> Array:
@@ -830,9 +840,11 @@ def NRMSE(F1: Array, F2: Array, rel_tol: float = 1e-3) -> float:
     assert abs((x - y) / x) < rel_tol, 'arrays do not have same sum (up to rel. tol.)'
     # assert np.isclose(F1.sum(), F2.sum()), 'arrays should have same sum'
 
-    rmse = np.sqrt(np.power(F1 - F2, 2).sum())
+    diff = F1 - F2
+    power = diff.power(2) if sparse.issparse(diff) else np.power(2)
+    rmse = np.sqrt(power.sum())
 
-    return rmse / F1.sum()
+    return rmse / x
 
 
 def _iterative_proportional_fit(f_mat: Array,
