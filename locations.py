@@ -302,6 +302,7 @@ class Locations(object):
 
         if constraint_type == 'production':
             x0 = [1, 1]
+
             def cost_fun(x):  # gamma, beta
                 fmat = self.gravity_matrix(x[0], β=x[1])
                 pmat = self.probability_matrix(fmat, constraint_type)
@@ -310,6 +311,7 @@ class Locations(object):
 
         elif constraint_type == 'attraction':
             x0 = [1, 1]
+
             def cost_fun(x):  # gamma, alpha
                 fmat = self.gravity_matrix(x[0], α=x[1])
                 pmat = self.probability_matrix(fmat, constraint_type)
@@ -318,6 +320,7 @@ class Locations(object):
 
         elif constraint_type == 'doubly':
             x0 = [2]
+
             def cost_fun(x):  # gamma
                 fmat = self.gravity_matrix(x[0])
                 T_model = simple_ipf(fmat, self.data_out, self.data_in,
@@ -461,7 +464,7 @@ class Locations(object):
 
         for k in range(nb_repeats):
             T = self.draw_multinomial(pmat, constraint_type, seed=k)
-            out[k] = CPC(T, self.data), CPL(T, self.data), NRMSE(T, self.data)
+            out[k] = CPC(T, self.data), CPL(T, self.data), RMSE(T, self.data)
 
         return out
 
@@ -823,9 +826,9 @@ def CPL(F1: Array, F2: Array, rel_tol: float = 1e-3) -> float:
     return 2 * np.sum(prod) / (np.sum(bool_F1) + np.sum(bool_F2))
 
 
-def NRMSE(F1: Array, F2: Array, rel_tol: float = 1e-3) -> float:
+def RMSE(F1: Array, F2: Array, rel_tol: float = 1e-3) -> float:
     """
-    Calculate normalised root mean-squared error between two models.
+    Calculate root-mean-square error between two models.
 
     Parameters
     ----------
@@ -840,11 +843,12 @@ def NRMSE(F1: Array, F2: Array, rel_tol: float = 1e-3) -> float:
     assert abs((x - y) / x) < rel_tol, 'arrays do not have same sum (up to rel. tol.)'
     # assert np.isclose(F1.sum(), F2.sum()), 'arrays should have same sum'
 
-    diff = F1 - F2
-    power = diff.power(2) if sparse.issparse(diff) else np.power(2)
-    rmse = np.sqrt(power.sum())
+    N = np.prod(F1.shape)
 
-    return rmse / x
+    diff = F1 - F2
+    power = diff.power(2) if sparse.issparse(diff) else np.power(diff, 2)
+
+    return np.sqrt(power.sum() / N)
 
 
 def _iterative_proportional_fit(f_mat: Array,

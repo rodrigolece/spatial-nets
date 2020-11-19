@@ -62,7 +62,7 @@ for dmat in dmat_files:
 
     cpc = [CPC(T_data, model) for model in models]
     cpl = [CPL(T_data, model) for model in models]
-    rms = [NRMSE(T_data, model) for model in models]
+    rms = [RMSE(T_data, model) for model in models]
     results = np.array([cpc, cpl, rms])
 
     rows = ['CPC', 'CPL', 'NMRSE']
