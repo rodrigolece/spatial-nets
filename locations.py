@@ -293,14 +293,23 @@ class Locations(object):
         if self.data is None:
             raise DataNotSet('the data for comparison is needed')
 
-        assert constraint_type in ['production', 'attraction', 'doubly'], \
+        assert constraint_type in ['unconstrained', 'production', 'attraction', 'doubly'], \
             f'invalid constraint {constraint_type}'
 
         # The observations
         i, j = self.data.nonzero()
         y = np.asarray(self.data[i, j]).flatten()
 
-        if constraint_type == 'production':
+        if constraint_type == 'unconstrained':
+            x0 = [2, 1, 1]
+
+            def cost_fun(x):  # gamma, alpha, beta
+                fmat = self.gravity_matrix(x[0], α=x[1], β=x[2])
+                K = self.data.sum() / fmat.sum()
+                T_model = K * fmat
+                return y - T_model[i, j]
+
+        elif constraint_type == 'production':
             x0 = [1, 1]
 
             def cost_fun(x):  # gamma, beta
