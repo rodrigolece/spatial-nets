@@ -50,7 +50,7 @@ for dmat in dmat_files:
 
     # Gravity: unconstrained
     # α, β, γ = locs.gravity_calibrate_all()
-    α, β, γ = locs.gravity_calibrate_nonlinear(constraint_type='unconstrained')
+    γ, α, β = locs.gravity_calibrate_nonlinear(constraint_type='unconstrained')
     fmat = locs.gravity_matrix(**{'γ': γ, 'α': α, 'β': β})
     K = locs.data.sum() / fmat.sum()
     T_unc = K * fmat
