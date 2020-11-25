@@ -1048,7 +1048,7 @@ def save_model(filename, locs=None, constraint_type=None,
         save_dict['locs'] = locs
 
     if constraint_type is not None:
-        assert constraint_type in ['unconstrained', 'production' \
+        assert constraint_type in ['unconstrained', 'production', \
                                    'attraction', 'doubly']
         save_dict['constraint_type'] = constraint_type
 
