@@ -59,13 +59,13 @@ for dmat in dmat_files:
     γ, β = locs.gravity_calibrate_nonlinear(constraint_type='production')
     fmat = locs.gravity_matrix(**{'γ': γ, 'β': β})
     pmat_prod = locs.probability_matrix(fmat, 'production')
-    T_prod = locs.orig_rel[:, np.newaxis] * pmat_prod
+    T_prod = locs.data_out[:, np.newaxis] * pmat_prod
 
     # Gravity: attraction
     γ, α = locs.gravity_calibrate_nonlinear(constraint_type='attraction')
     fmat = locs.gravity_matrix(**{'γ': γ, 'α': α})
     pmat_attrac = locs.probability_matrix(fmat, 'attraction')
-    T_attrac = pmat_attrac * locs.dest_rel[np.newaxis, :]
+    T_attrac = pmat_attrac * locs.data_in[np.newaxis, :]
 
     # Gravity: doubly
     γ = locs.gravity_calibrate_nonlinear(constraint_type='doubly')

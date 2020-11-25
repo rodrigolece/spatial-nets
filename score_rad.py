@@ -57,7 +57,8 @@ for dmat in dmat_files:
     T_unc = K * pmat_prod
 
     # Radiation: attraction
-    pmat_attrac = locs.probability_matrix(T_prod, 'attraction')
+    fmat = locs.radiation_matrix(finite_correction=False)
+    pmat_attrac = locs.probability_matrix(fmat, 'attraction')
     T_attrac = pmat_attrac * locs.data_in[np.newaxis, :]
 
     # Radiation: doubly
