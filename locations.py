@@ -314,7 +314,7 @@ class Locations(object):
             x0 = [1, 1]
 
             def cost_fun(x):  # gamma, beta
-                fmat = self.gravity_matrix(x[0], β=x[1])
+                fmat = self.gravity_matrix(x[0], α=0, β=x[1])
                 pmat = self.probability_matrix(fmat, constraint_type)
                 T_model = self.data_out[:, np.newaxis] * pmat
                 return y - T_model[i, j]
@@ -323,7 +323,7 @@ class Locations(object):
             x0 = [1, 1]
 
             def cost_fun(x):  # gamma, alpha
-                fmat = self.gravity_matrix(x[0], α=x[1])
+                fmat = self.gravity_matrix(x[0], α=x[1], β=0)
                 pmat = self.probability_matrix(fmat, constraint_type)
                 T_model = pmat * self.data_in[np.newaxis, :]
                 return y - T_model[i, j]
@@ -332,7 +332,7 @@ class Locations(object):
             x0 = [2]
 
             def cost_fun(x):  # gamma
-                fmat = self.gravity_matrix(x[0])
+                fmat = self.gravity_matrix(x[0], α=0, β=0)
                 T_model = simple_ipf(fmat, self.data_out, self.data_in,
                                      maxiters=200,
                                      verbose=verbose)
@@ -1034,7 +1034,8 @@ def simple_ipf(mat: Array,
     return (out, a, b) if return_vecs else out
 
 
-def save_model(filename, locs=None, grav_params=None, balancing_factors=None):
+def save_model(filename, locs=None, constraint_type=None,
+               grav_params=None, balancing_factors=None):
     """
     Save a model storing optionally the locations object, the parameters or
     the balancing factors.
@@ -1046,6 +1047,11 @@ def save_model(filename, locs=None, grav_params=None, balancing_factors=None):
         assert locs.data is not None
         save_dict['locs'] = locs
 
+    if constraint_type is not None:
+        assert constraint_type in ['unconstrained', 'production' \
+                                   'attraction', 'doubly']
+        save_dict['constraint_type'] = constraint_type
+
     if grav_params is not None:
         assert len(grav_params) == 3
         save_dict['grav_params'] = grav_params
@@ -1054,8 +1060,13 @@ def save_model(filename, locs=None, grav_params=None, balancing_factors=None):
         assert len(balancing_factors) == 2
         save_dict['balancing_factors'] = balancing_factors
 
-    with open(filename, 'wb') as f:
-        pickle.dump(save_dict, f)
+    if len(save_dict) > 0:
+        with open(filename, 'wb') as f:
+            pickle.dump(save_dict, f)
+    else:
+        print('Need to provide arguments')
+
+    return None
 
 
 def load_gravity_model(filename, locs=None, return_locs=False):
@@ -1066,20 +1077,40 @@ def load_gravity_model(filename, locs=None, return_locs=False):
     """
     with open(filename, 'rb') as f:
         data = pickle.load(f)
+        constraint_type = data.get('constraint_type')
 
-    if locs is not None:
-        pass
-    elif 'locs' in data:
-        locs = data['locs']
-    else:
-        raise AttributeError
+        if locs is not None:
+            pass
+        elif 'locs' in data:
+            locs = data['locs']
+        else:
+            raise AttributeError('`locs` not provided')
 
-    fmat = locs.gravity_matrix(*data['params'])
+        fmat = locs.gravity_matrix(*data['grav_params'])
 
-    if 'balancing_factors' in data:
+    if constraint_type is None:
+        out = fmat
+
+    elif constraint_type == 'unconstrained':
+        K = locs.data.sum() / fmat.sum()
+        out = K * fmat
+
+    elif constraint_type == 'production':
+        pmat = locs.probability_matrix(fmat, 'production')
+        out = locs.data_out[:, np.newaxis] * pmat
+
+    elif constraint_type == 'attraction':
+        pmat = locs.probability_matrix(fmat, 'attraction')
+        out = pmat * locs.data_in[np.newaxis, :]
+
+    elif constraint_type == 'doubly' and 'balancing_factors' in data:
         a, b = data['balancing_factors']
         out = a[:, np.newaxis] * fmat * b[np.newaxis, :]
+
+    elif constraint_type == 'doubly':
+        out = simple_ipf(fmat, locs.data_out, locs.data_in)
+
     else:
-        out = fmat
+        pass
 
     return (out, locs) if return_locs else out
