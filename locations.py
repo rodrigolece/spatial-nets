@@ -278,6 +278,7 @@ class Locations(object):
         return out
 
     def gravity_calibrate_nonlinear(self, constraint_type: str = 'production',
+                                    maxiters=500,
                                     verbose: bool = False) -> Tuple[float, float]:
         """
         Calibrate the gravity model using nonlinear least squares.
@@ -334,7 +335,7 @@ class Locations(object):
             def cost_fun(x):  # gamma
                 fmat = self.gravity_matrix(x[0], α=0, β=0)
                 T_model = simple_ipf(fmat, self.data_out, self.data_in,
-                                     maxiters=200,
+                                     maxiters=maxiters,
                                      verbose=verbose)
                 return y - T_model[i, j]
 
