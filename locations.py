@@ -277,7 +277,7 @@ class Locations(object):
 
         return out
 
-    def gravity_calibrate_nonlinear(self, constraint_type: str = 'production',
+    def gravity_calibrate_nonlinear(self, constraint_type: str,
                                     maxiters=500,
                                     verbose: bool = False) -> Tuple[float, float]:
         """
@@ -285,7 +285,7 @@ class Locations(object):
 
         Parameters
         ----------
-        constraint_type : str, optional
+        constraint_type : str
 
         Returns
         -------
@@ -354,6 +354,76 @@ class Locations(object):
 
         if verbose:
             print('Status: ', st_dict[st])
+
+        return res.x
+
+    def gravity_calibrate_cpc(self, constraint_type: str,
+                              maxiters=500,
+                              verbose: bool = False) -> Tuple[float, float]:
+        """
+        Calibrate the gravity model using CPC minisation
+
+        Parameters
+        ----------
+        constraint_type : str
+
+        Returns
+        -------
+        float, float
+
+        """
+        if self.data is None:
+            raise DataNotSet('the data for comparison is needed')
+
+        assert constraint_type in ['unconstrained', 'production', 'attraction', 'doubly'], \
+            f'invalid constraint {constraint_type}'
+
+        if constraint_type == 'unconstrained':
+            x0 = [2, 1, 1]
+            bounds = [(0, None)] * 3
+
+            def cost_fun(x):  # gamma, alpha, beta
+                fmat = self.gravity_matrix(x[0], α=x[1], β=x[2])
+                K = self.data.sum() / fmat.sum()
+                T_model = K * fmat
+                return 1 - CPC(T_model, self.data)
+
+        elif constraint_type == 'production':
+            x0 = [1, 1]
+            bounds = [(0, None)] * 2
+
+            def cost_fun(x):  # gamma, beta
+                fmat = self.gravity_matrix(x[0], α=0, β=x[1])
+                pmat = self.probability_matrix(fmat, constraint_type)
+                T_model = self.data_out[:, np.newaxis] * pmat
+                return 1 - CPC(T_model, self.data)
+
+        elif constraint_type == 'attraction':
+            x0 = [1, 1]
+            bounds = [(0, None)] * 2
+
+            def cost_fun(x):  # gamma, alpha
+                fmat = self.gravity_matrix(x[0], α=x[1], β=0)
+                pmat = self.probability_matrix(fmat, constraint_type)
+                T_model = pmat * self.data_in[np.newaxis, :]
+                return 1 - CPC(T_model, self.data)
+
+        elif constraint_type == 'doubly':
+            x0 = [2]
+            bounds = [(0, None)]
+
+            def cost_fun(x):  # gamma
+                fmat = self.gravity_matrix(x[0], α=0, β=0)
+                T_model = simple_ipf(fmat, self.data_out, self.data_in,
+                                     maxiters=maxiters,
+                                     verbose=verbose)
+                return 1 - CPC(T_model, self.data)
+
+        res = optimize.minimize(cost_fun, x0, bounds=bounds)
+        # assert res.sucess, f'optimization exit status is failure'
+
+        if verbose:
+            print('Status: ', res.message)
 
         return res.x
 
