@@ -34,7 +34,7 @@ for dmat in dmat_files:
     locs = DataLocations(dmat, T_data)
 
     # Gravity model
-    α, β, γ = locs.gravity_calibrate_all(verbose=False)
+    γ, α, β = locs.gravity_calibrate_all(verbose=False)
     fmat = locs.gravity_matrix(**{'γ': γ, 'α': α, 'β': β})
 
     doubly_stochastic = simple_ipf(fmat, tol=1e-6)

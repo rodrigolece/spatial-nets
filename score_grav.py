@@ -49,7 +49,7 @@ for dmat in dmat_files:
     locs = DataLocations(dmat, T_data)
 
     # Gravity: unconstrained
-    # α, β, γ = locs.gravity_calibrate_all()
+    # γ, α, β = locs.gravity_calibrate_all()
     γ, α, β = locs.gravity_calibrate_nonlinear(constraint_type='unconstrained')
     fmat = locs.gravity_matrix(**{'γ': γ, 'α': α, 'β': β})
     K = locs.data.sum() / fmat.sum()

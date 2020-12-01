@@ -460,7 +460,7 @@ class Locations(object):
 
         Returns
         -------
-        α, β, γ : float
+        γ, α, β : float
 
         """
         if self.data is None:
@@ -496,7 +496,7 @@ class Locations(object):
         if γ < 0.5:
             warnings.warn(f'γ = {γ:.3f}')
 
-        return α, β, γ
+        return γ, α, β
 
     def probability_matrix(self, f_mat: Array, constraint_type: str) -> Array:
         """
