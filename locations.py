@@ -361,7 +361,7 @@ class Locations(object):
                     out = y - T_model[i, j]
                 return out
 
-        res = optimize.least_squares(cost_fun, x0)
+        res = optimize.least_squares(cost_fun, x0, bounds=bounds)
         st = res.status
         assert st > 0, f'optimization exit status is failure'
 
@@ -482,9 +482,9 @@ class Locations(object):
         X = np.vstack((m_repeated[i, j], n_repeated[i, j], self.dmat[i, j])).T
         logX = np.log(X)
 
-        if verbose:
-            ρ, _ = stats.pearsonr(logX[:, 0], logX[:, 1])
-            print(f'Correlation between log O and D columns, ρ : {ρ:.3f}\n')
+        # if verbose:
+        #     ρ, _ = stats.pearsonr(logX[:, 0], logX[:, 1])
+        #     print(f'Correlation between log O and D columns, ρ : {ρ:.3f}\n')
 
         reg = linear_model.LinearRegression()
         reg.fit(logX, np.log(y))
