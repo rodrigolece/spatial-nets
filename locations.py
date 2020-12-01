@@ -128,9 +128,10 @@ class Locations(object):
 
     def __str__(self) -> str:
         if self._tworelevancesflag:
-            s = f'''
+            s = f"""
                 Locations object (orig. and dest. relevance provided):
-                    N={self.N} and k={self.k}'''
+                    N={self.N} and k={self.k}
+                """
         else:
             s = f'Locations object: N={self.N} and k={self.k}'
 
@@ -570,44 +571,49 @@ class Locations(object):
 
         return out
 
-    # def constrained_flux(self, f_mat: Array,
-    #                      constraint_type: str) -> Array:
-    #     """
-    #     Calculate the constrained flux from the affinity matrix f_ij.
-    #
-    #     Parameters
-    #     ----------
-    #     f_mat : array_like
-    #     constrained : {'production', 'attraction', 'unconstrained', 'doubly'}
-    #
-    #     Returns
-    #     -------
-    #     np.array
-    #         NxN constrained flow matrix.
-    #
-    #     """
-    #     if self.data is None:
-    #         raise DataNotSet('the data for the constraints is needed')
-    #
-    #     assert constraint_type in ['production', 'attraction', 'unconstrained',
-    #                                'doubly'], \
-    #         f'invalid constraint {constraint_type}'
-    #
-    #     if constraint_type == 'unconstrained':
-    #         ϕ = self.data.sum() * f_mat / f_mat.sum()
-    #
-    #     elif constraint_type == 'production':
-    #         p_mat = self.probability_matrix(f_mat, constraint_type)
-    #         ϕ = p_mat * self.data_out[:, np.newaxis]
-    #
-    #     elif constraint_type == 'attraction':
-    #         p_mat = self.probability_matrix(f_mat, constraint_type)
-    #         ϕ = self.data_in[np.newaxis, :] * p_mat
-    #
-    #     elif constraint_type == 'doubly':
-    #         ϕ = _iterative_proportional_fit(f_mat, self.data_out, self.data_in)
-    #
-    #     return ϕ
+    def constrained_model(self, f_mat: Array,
+                          constraint_type: str,
+                          maxiters=500) -> Array:
+        """
+        Calculate the constrained flux from the affinity matrix f_ij.
+
+        Parameters
+        ----------
+        f_mat : array_like
+        constrained : {'unconstrained', 'production', 'attraction', 'doubly'}
+
+        Returns
+        -------
+        np.array
+            NxN constrained flow matrix.
+
+        """
+        if self.data is None:
+            raise DataNotSet('the data for the constraints is needed')
+
+        assert constraint_type in ['unconstrained', 'production', 'attraction',
+                                   'doubly'], \
+            f'invalid constraint {constraint_type}'
+
+        if constraint_type == 'unconstrained':
+            K = self.data.sum() / f_mat.sum()
+            out = K * f_mat
+
+        elif constraint_type == 'production':
+            p_mat = self.probability_matrix(f_mat, constraint_type)
+            out = self.data_out[:, np.newaxis] * p_mat
+
+        elif constraint_type == 'attraction':
+            p_mat = self.probability_matrix(f_mat, constraint_type)
+            out = p_mat * self.data_in[np.newaxis, :]
+
+        elif constraint_type == 'doubly':
+            out = _iterative_proportional_fit(f_mat, self.data_out, self.data_in)
+            out = simple_ipf(f_mat, self.data_out, self.data_in,
+                             maxiters=maxiters,
+                             verbose=verbose)
+
+        return out
 
     # def constrained_model(self, model: str,
     #                       constraint_type: str,
