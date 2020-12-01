@@ -279,6 +279,7 @@ class Locations(object):
 
     def gravity_calibrate_nonlinear(self, constraint_type: str,
                                     maxiters=500,
+                                    use_log=False,
                                     verbose: bool = False) -> Tuple[float, float]:
         """
         Calibrate the gravity model using nonlinear least squares.
@@ -304,40 +305,60 @@ class Locations(object):
 
         if constraint_type == 'unconstrained':
             x0 = [2, 1, 1]
+            bounds = ([-np.inf, 0, 0], [np.inf, np.inf, np.inf])
 
             def cost_fun(x):  # gamma, alpha, beta
                 fmat = self.gravity_matrix(x[0], α=x[1], β=x[2])
                 K = self.data.sum() / fmat.sum()
                 T_model = K * fmat
-                return y - T_model[i, j]
+                if use_log:
+                    out = np.log(y) - np.log(T_model[i, j])
+                else:
+                    out = y - T_model[i, j]
+                return out
 
         elif constraint_type == 'production':
             x0 = [1, 1]
+            bounds = ([-np.inf, 0], [np.inf, np.inf])
 
             def cost_fun(x):  # gamma, beta
                 fmat = self.gravity_matrix(x[0], α=0, β=x[1])
                 pmat = self.probability_matrix(fmat, constraint_type)
                 T_model = self.data_out[:, np.newaxis] * pmat
-                return y - T_model[i, j]
+                if use_log:
+                    out = np.log(y) - np.log(T_model[i, j])
+                else:
+                    out = y - T_model[i, j]
+                return out
 
         elif constraint_type == 'attraction':
             x0 = [1, 1]
+            bounds = ([-np.inf, 0], [np.inf, np.inf])
 
             def cost_fun(x):  # gamma, alpha
                 fmat = self.gravity_matrix(x[0], α=x[1], β=0)
                 pmat = self.probability_matrix(fmat, constraint_type)
                 T_model = pmat * self.data_in[np.newaxis, :]
-                return y - T_model[i, j]
+                if use_log:
+                    out = np.log(y) - np.log(T_model[i, j])
+                else:
+                    out = y - T_model[i, j]
+                return out
 
         elif constraint_type == 'doubly':
             x0 = [2]
+            bounds = (-np.inf, np.inf)
 
             def cost_fun(x):  # gamma
                 fmat = self.gravity_matrix(x[0], α=0, β=0)
                 T_model = simple_ipf(fmat, self.data_out, self.data_in,
                                      maxiters=maxiters,
                                      verbose=verbose)
-                return y - T_model[i, j]
+                if use_log:
+                    out = np.log(y) - np.log(T_model[i, j])
+                else:
+                    out = y - T_model[i, j]
+                return out
 
         res = optimize.least_squares(cost_fun, x0)
         st = res.status
