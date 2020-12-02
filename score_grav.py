@@ -69,7 +69,7 @@ for dmat in dmat_files:
 
     # Gravity: production
     ct = 'production'
-    c, b, *other = method(constraint_type=ct, **kwargs)
+    c, *other, b = method(constraint_type=ct, **kwargs)
     fmat = locs.gravity_matrix(c, α=0, β=b)
     T_prod = locs.constrained_model(fmat, ct)
     pmat_prod = locs.probability_matrix(T_prod, ct)
