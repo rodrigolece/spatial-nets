@@ -449,7 +449,8 @@ class Locations(object):
 
         return res.x
 
-    def gravity_calibrate_all(self, verbose: bool = False) -> Tuple[float, float, float]:
+    def gravity_calibrate_all(self, verbose: bool = False,
+                              **kwargs) -> Tuple[float, float, float]:
         """
         Calibrate the all of the gravity parameters using linear least squares.
 
@@ -573,7 +574,8 @@ class Locations(object):
 
     def constrained_model(self, f_mat: Array,
                           constraint_type: str,
-                          maxiters=500) -> Array:
+                          maxiters=500,
+                          verbose=False) -> Array:
         """
         Calculate the constrained flux from the affinity matrix f_ij.
 
@@ -608,7 +610,6 @@ class Locations(object):
             out = p_mat * self.data_in[np.newaxis, :]
 
         elif constraint_type == 'doubly':
-            out = _iterative_proportional_fit(f_mat, self.data_out, self.data_in)
             out = simple_ipf(f_mat, self.data_out, self.data_in,
                              maxiters=maxiters,
                              verbose=verbose)

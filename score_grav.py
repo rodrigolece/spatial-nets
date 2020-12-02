@@ -11,6 +11,9 @@ import utils
 parser = argparse.ArgumentParser(description='Parse input files')
 # parser.add_argument('flow_file', help='The name of the file containing flows')
 # parser.add_argument('dmat_file', help='The file constaining the distance matrix')
+parser.add_argument('fun', help='Param. calibration method')
+parser.add_argument('-l', '--log', action='store_true',
+                    help='Call calibration method with option use_log=True')
 parser.add_argument('-e', '--exact', action='store_true',
                     help='Use exact calculation of p-values')
 parser.add_argument('-o', '--output', default=None,
@@ -19,6 +22,15 @@ parser.add_argument('-s', '--significance', type=float, default=0.01,
                     help='Significance threshold')
 
 args = parser.parse_args()
+
+assert args.fun in ['nonlinear', 'cpc', 'all'], f'invalid calibration method {args.fun}'
+print(f"\nParam. calibration method: '{args.fun}'")
+
+if args.log:
+    kwargs = dict(use_log=True)
+    print('Using log-loss function')
+else:
+    kwargs = {}
 
 sig = args.significance
 output_file = args.output
@@ -47,31 +59,32 @@ for dmat in dmat_files:
     dmat = utils.load_dmat(dmat)
 
     locs = DataLocations(dmat, T_data)
+    method = getattr(locs, f'gravity_calibrate_{args.fun}')
 
     # Gravity: unconstrained
-    # γ, α, β = locs.gravity_calibrate_all()
-    γ, α, β = locs.gravity_calibrate_nonlinear(constraint_type='unconstrained')
-    fmat = locs.gravity_matrix(**{'γ': γ, 'α': α, 'β': β})
-    K = locs.data.sum() / fmat.sum()
-    T_unc = K * fmat
+    ct = 'unconstrained'
+    c, a, b = method(constraint_type=ct, **kwargs)
+    fmat = locs.gravity_matrix(c, α=a, β=b)
+    T_unc = locs.constrained_model(fmat, ct)
 
     # Gravity: production
-    γ, β = locs.gravity_calibrate_nonlinear(constraint_type='production')
-    fmat = locs.gravity_matrix(**{'γ': γ, 'β': β})
-    pmat_prod = locs.probability_matrix(fmat, 'production')
-    T_prod = locs.data_out[:, np.newaxis] * pmat_prod
+    ct = 'production'
+    c, b, *other = method(constraint_type=ct, **kwargs)
+    fmat = locs.gravity_matrix(c, α=0, β=b)
+    T_prod = locs.constrained_model(fmat, ct)
+    pmat_prod = locs.probability_matrix(T_prod, ct)
 
     # Gravity: attraction
-    γ, α = locs.gravity_calibrate_nonlinear(constraint_type='attraction')
-    fmat = locs.gravity_matrix(**{'γ': γ, 'α': α})
-    pmat_attrac = locs.probability_matrix(fmat, 'attraction')
-    T_attrac = pmat_attrac * locs.data_in[np.newaxis, :]
+    ct = 'attraction'
+    c, a, *other = method(constraint_type=ct, **kwargs)
+    fmat = locs.gravity_matrix(c, α=a, β=0)
+    T_attrac = locs.constrained_model(fmat, ct)
+    pmat_attrac = locs.probability_matrix(fmat, ct)
 
     # Gravity: doubly
-    γ = locs.gravity_calibrate_nonlinear(constraint_type='doubly')
-    fmat = locs.gravity_matrix(γ)
-    T_doubly = simple_ipf(fmat, locs.data_out, locs.data_in,
-                          maxiters=500, verbose=True)
+    c, *other = method(constraint_type='doubly', **kwargs)
+    fmat = locs.gravity_matrix(c, α=0, β=0)
+    T_doubly = locs.constrained_model(fmat, 'doubly')
     pmat_doubly_prod = locs.probability_matrix(T_doubly, 'production')
     pmat_doubly_attrac = locs.probability_matrix(T_doubly, 'attraction')
 
