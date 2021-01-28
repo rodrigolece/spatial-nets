@@ -763,7 +763,9 @@ class Locations(object):
 
         for k in range(n):
             i, j = ii[k], jj[k]
-            out[k] = _binomial_pvalues(Ns[k], pmat[i, j], self.data[i, j])
+            x, n, p = self.data[i, j], Ns[k], pmat[i, j]
+            out[k, 0] = stats.binom_test(x, n=n, p=p, alternative='greater')
+            out[k, 1] = stats.binom_test(x, n=n, p=p, alternative='less')
 
         return out
 
@@ -839,46 +841,46 @@ class DataLocations(Locations):
 
 
 # Outside the classes
-def _binomial_pvalues(N: int, p: float, x: int) -> Tuple[float, float]:
-    """
-    Calculate a p-value according to the binomial distribution.
-
-    Parameters
-    ----------
-    N, p : int, float
-        The parameters of the binomial distribution.
-    x : int
-        The observation.
-
-    Returns
-    -------
-    float, float
-
-    """
-    # N, x = int(N), int(x)
-    B = stats.binom(N, p)
-
-    # It would be useful to assume x > 0; that case is generally covered
-    # when I call using T_data.nonzero(). The other limiting case is when
-    # x == N
-    if x == N:
-        out = p**N, 1.0
-
-    # Test below seems is slower (2m23 vs 1m35 for UK commuting data)
-    # elif x < N // 2:
-    #     probas = B.pmf(range(x + 1)).cumsum()
-    #     out = 1 - round(probas[x - 1], 6), round(probas[x], 6)
-    # else:
-    #     probas = B.pmf(range(N, x - 1, -1)).cumsum()
-    #     out = round(probas[-1], 6), 1 - round(probas[-2], 6)
-
-    else:
-        probas = B.pmf(range(x + 1)).cumsum()
-        out = 1 - round(probas[x - 1], 6), round(probas[x], 6)
-        # due to numerical errors I can get cumsum larger than 1 and this is why
-        # we need to use rounding
-
-    return out
+# def _binomial_pvalues(N: int, p: float, x: int) -> Tuple[float, float]:
+#     """
+#     Calculate a p-value according to the binomial distribution.
+#
+#     Parameters
+#     ----------
+#     N, p : int, float
+#         The parameters of the binomial distribution.
+#     x : int
+#         The observation.
+#
+#     Returns
+#     -------
+#     float, float
+#
+#     """
+#     # N, x = int(N), int(x)
+#     B = stats.binom(N, p)
+#
+#     # It would be useful to assume x > 0; that case is generally covered
+#     # when I call using T_data.nonzero(). The other limiting case is when
+#     # x == N
+#     if x == N:
+#         out = p**N, 1.0
+#
+#     # Test below is slower (2m23 vs 1m35 for UK commuting data)
+#     # elif x < N // 2:
+#     #     probas = B.pmf(range(x + 1)).cumsum()
+#     #     out = 1 - round(probas[x - 1], 6), round(probas[x], 6)
+#     # else:
+#     #     probas = B.pmf(range(N, x - 1, -1)).cumsum()
+#     #     out = round(probas[-1], 6), 1 - round(probas[-2], 6)
+#
+#     else:
+#         probas = B.pmf(range(x + 1)).cumsum()
+#         out = 1 - round(probas[x - 1], 6), round(probas[x], 6)
+#         # due to numerical errors I can get cumsum larger than 1 and this is why
+#         # we need to use rounding
+#
+#     return out
 
 
 def CPC(F1: Array, F2: Array, rel_tol: float = 1e-3) -> float:
