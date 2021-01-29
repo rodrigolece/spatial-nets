@@ -1,9 +1,11 @@
+import os
+from pathlib import Path
 import warnings
 import numpy as np
 import pandas as pd
 import scipy.sparse as sp
 from scipy.io import loadmat
-from typing import List
+from typing import List, Union
 
 import graph_tool as gt
 
@@ -219,6 +221,9 @@ def benchmark_cerina(nb_nodes, edge_density, l, beta, epsilon, L=1.0, seed=0):
     idx, = draw.nonzero()
     mat = sp.coo_matrix((draw[idx], (i[idx], j[idx])), shape=(N, N))
 
+    # more useful values in atrribute vector
+    comm_vec[N // 2:] = 0
+
     return coords, np.squeeze(comm_vec), mat
 
 
@@ -234,7 +239,7 @@ def benchmark_expert(nb_nodes, edge_density, lamb, gamma=2, L=100.0, seed=0):
 
     # Attibute assignment
     comm_vec = np.ones(N, dtype=int)
-    comm_vec[N // 2:] *= -1
+    comm_vec[N // 2:] = -1  # helpful for checking same/diff comm
 
     # Edge selection
     smat = (comm_vec * comm_vec[:, np.newaxis]).astype(float)
@@ -250,6 +255,9 @@ def benchmark_expert(nb_nodes, edge_density, lamb, gamma=2, L=100.0, seed=0):
     draw = rng.multinomial(nb_edges, probas)
     idx, = draw.nonzero()
     mat = sp.coo_matrix((draw[idx], (i[idx], j[idx])), shape=(N, N))
+
+    # more useful values in atrribute vector
+    comm_vec[N // 2:] = 0
 
     return coords, np.squeeze(comm_vec), mat
 
@@ -301,10 +309,10 @@ def load_dmat(file: str, exclude_positions: List[int] = None):
     np.array
 
     """
-    assert file.endswith(('.mat', '.npz')), 'supported formats are .mat and .npz'
-    format = file[-3:]
+    assert (ext := os.path.splitext(file)[1]) in ('.mat', '.npz'), \
+            f"unsupported format: {ext} (use '.mat' or '.npz')"
 
-    dmat = loadmat(file)['dmat'] if format == 'mat' else sp.load_npz(file)
+    dmat = loadmat(file)['dmat'] if ext == '.mat' else sp.load_npz(file)
 
     m, n = dmat.shape
     assert m == n, 'matrix should be square'
@@ -331,13 +339,13 @@ def load_dmat(file: str, exclude_positions: List[int] = None):
     return dmat
 
 
-def load_flows(file: str, zero_diag: bool = True):
+def load_flows(file: Union[str, Path], zero_diag: bool = True):
     """
     Read flows from file.
 
     Parameters
     ----------
-    file : str
+    file : str or Path
         Formats accepted: `.npz`, `.csv` or `.adj` (custom-made format).
 
     Returns
@@ -345,20 +353,19 @@ def load_flows(file: str, zero_diag: bool = True):
     sp.csr.csr_matrix
 
     """
-    assert file.endswith(('.npz', '.csv', 'adj')), \
-        'supported formats are .npz, .csv and .adj'
-    format = file[-3:]
+    assert (ext := os.path.splitext(file)[1]) in ('.npz', '.csv', 'adj'), \
+           f"unsupported format: {ext} (use '.npz', '.csv' or '.adj')"
 
-    if format == 'npz':
+    if ext == '.npz':
         out = sp.load_npz(file)
 
-    elif format in ('csv', 'adj'):
+    elif ext in ('.csv', '.adj'):
         df = pd.read_csv(file, header=0)
         df.columns = df.columns.str.lower()
 
         col_names = ['origin', 'destination', 'flow']
 
-        if format == 'adj':
+        if ext == '.adj':
             adj_colnames_map = {'previous_store_id': 'origin',
                                 'store_id': 'destination',
                                 'visits': 'flow'}
