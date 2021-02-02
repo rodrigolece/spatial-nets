@@ -12,11 +12,11 @@ import graph_tool as gt
 from sklearn.metrics import pairwise
 
 
-__all__ = [
-    'sparsemat_from_flow', 'sparsemat_remove_diag',
-    'load_dmat', 'load_flows'
-    'benchmark_cerina', 'greatcircle_distance'
-]
+#__all__ = [
+#    'sparsemat_from_flow', 'sparsemat_remove_diag',
+#    'load_dmat', 'load_flows',
+#    'benchmark_cerina', 'greatcircle_distance'
+#]
 
 
 def build_graph(mat, idx=None, directed=True, coords=None, vertex_properties={}):
@@ -62,6 +62,31 @@ def build_graph(mat, idx=None, directed=True, coords=None, vertex_properties={})
         G.vertex_properties[name] = vp
 
     return G
+
+
+def build_significant_graph(locs,
+                            coords,
+                            model='gravity-doubly',
+                            pvalue_constraint='production',
+                            significance=0.01,
+                            verbose=False):
+
+    family, constraint_type = model.split('-')
+
+    if family == 'gravity' and constraint_type == 'doubly':
+        c, *other = locs.gravity_calibrate_nonlinear(constraint_type='doubly')
+        fmat = locs.gravity_matrix(c, α=0, β=0)
+        T_model = locs.constrained_model(fmat, 'doubly', verbose=verbose)
+    else:
+        raise NotImplementedError
+
+    pmat = locs.probability_matrix(T_model, pvalue_constraint)
+    pvals = locs.pvalues_exact(pmat, constraint_type=pvalue_constraint) < significance
+    idx_plus = pvals[:, 0]
+
+    out = build_graph(locs.data, idx_plus, coords=coords, directed=True)
+
+    return out
 
 
 def build_weighted_graph(coo_mat, directed=False, coords=None, vertex_properties={}):
