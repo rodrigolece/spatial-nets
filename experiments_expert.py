@@ -11,37 +11,42 @@ import utils
 
 
 def grav_experiment(n, rho, lamb, gamma=2.0,
+                    model='gravity-doubly',
+                    pvalue_constraint='production',
                     nb_repeats=10,
+                    nb_net_repeats=2,
                     significance=0.01,
                     verbose=False,
                     **kwargs
                    ):
-    coords, comm_vec, mat = utils.benchmark_expert(n, rho, lamb, gamma=gamma)
-    bench = utils.build_weighted_graph(mat,
-                                       coords=coords,
-                                       vertex_properties={'b': comm_vec},
-                                       directed=False)  # the default
 
-    t_data = gt.adjacency(bench, weight=bench.ep.weight).astype(int)
-    locs = DataLocations(coords, t_data)
+    out = np.zeros((nb_repeats * nb_net_repeats, 5))  # overlap, nmi, vi, b, entropy
 
-    # calculate the p-values to build the graph with positive edges
-    graph = utils.build_significant_graph(locs, coords,
-                                          significance=significance,
-                                          verbose=verbose)
+    for k in range(nb_net_repeats):
+        coords, comm_vec, mat = utils.benchmark_expert(n, rho, lamb, gamma=gamma, seed=k)
+        bench = utils.build_weighted_graph(mat,
+                                           coords=coords,
+                                           vertex_properties={'b': comm_vec},
+                                           directed=False)  # the default
 
-    # the ground truth
-    ground_truth = gt.BlockState(bench, b=bench.vp.b)
-    x = ground_truth.b.a
+        t_data = gt.adjacency(bench, weight=bench.ep.weight).astype(int)
+        locs = DataLocations(coords, t_data)
 
-    out = np.zeros((nb_repeats, 5))  # overlap, nmi, vi, b, entropy
+        # calculate the p-values to build the graph with positive edges
+        graph = utils.build_significant_graph(locs, coords,
+                                              significance=significance,
+                                              verbose=verbose)
 
-    for i in range(nb_repeats):
-        state = gt.minimize_blockmodel_dl(graph, **kwargs)
-        ov = gt.partition_overlap(x, state.b.a, norm=True)
-        vi = gt.variation_information(x, state.b.a, norm=True)
-        nmi = gt.mutual_information(x, state.b.a, norm=True) * n  # bug in graph-tool's nmi
-        out[i] = ov, vi, nmi, state.get_nonempty_B(), state.entropy()
+        # the ground truth
+        ground_truth = gt.BlockState(bench, b=bench.vp.b)
+        x = ground_truth.b.a
+
+        for i in range(nb_repeats):
+            state = gt.minimize_blockmodel_dl(graph, **kwargs)
+            ov = gt.partition_overlap(x, state.b.a, norm=True)
+            vi = gt.variation_information(x, state.b.a, norm=True)
+            nmi = gt.mutual_information(x, state.b.a, norm=True) * n  # bug in graph-tool's nmi
+            out[k+i] = ov, vi, nmi, state.get_nonempty_B(), state.entropy()
 
     return out
 
@@ -60,14 +65,18 @@ if __name__ == '__main__':
     output_dir = Path('output') / 'benchmark_expert'
 
     parser = argparse.ArgumentParser()
+    parser.add_argument('model')
     parser.add_argument('nb_repeats', type=int)
-    parser.add_argument('n', type=int)
-    parser.add_argument('m', type=int)
+    parser.add_argument('nb_net_repeats', type=int)
+    parser.add_argument('-n', type=int, default=20)
+    parser.add_argument('-m', type=int, default=20)
     parser.add_argument('-B', '--fixB', action='store_true')
 
     args = parser.parse_args()
 
+    model = args.model
     nb_repeats = args.nb_repeats
+    nb_net_repeats = args.nb_net_repeats
     n, m = args.n, args.m
     fixB = args.fixB
     N = 100  # nb of nodes
@@ -98,8 +107,10 @@ if __name__ == '__main__':
 
     for i in tqdm(range(n)):
         for j in range(m):
-            results = grav_experiment(N, rho[i,j], lamb[i,j],
-                                            nb_repeats=nb_repeats, **gt_kwargs)
+            results = grav_experiment(N, rho[i,j], lamb[i,j], model=model,
+                                      nb_repeats=nb_repeats,
+                                      nb_net_repeats=nb_net_repeats,
+                                      **gt_kwargs)
             mn, std, best = summarise_results(results)
 
             overlap[i,j], overlap_std[i,j], overlap_best[i,j] = mn[0], std[0], best[0]
@@ -113,14 +124,18 @@ if __name__ == '__main__':
         'lamb': lamb,
         'overlap': overlap,
         'overlap_std': overlap_std,
-        'overlap_best': overlap_best,
         'vi': vi,
         'vi_std': vi_std,
-        'vi_best': vi_best,
         'nmi': nmi,
         'nmi_std': nmi_std,
-        'nmi_best': nmi_best,
     }
+
+    if nb_net_repeats == 1:
+        save_dict.update({
+            'overlap_best': overlap_best,
+            'vi_best': vi_best,
+            'nmi_best': nmi_best,
+        })
 
     if not fixB:
         save_dict.update({
@@ -131,7 +146,7 @@ if __name__ == '__main__':
 
 
     B_name = 'fixB_' if fixB else ''
-    filename = f'rho-lamb_{B_name}{nb_repeats}-{n}-{m}.npz'
+    filename = f'rho-lamb_{B_name}{model}_{nb_repeats}_{nb_net_repeats}.npz'
     print(f'\nWriting results to {filename}')
     np.savez(output_dir / filename, **save_dict)
 

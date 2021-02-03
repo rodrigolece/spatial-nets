@@ -67,22 +67,33 @@ def build_graph(mat, idx=None, directed=True, coords=None, vertex_properties={})
 def build_significant_graph(locs,
                             coords,
                             model='gravity-doubly',
-                            pvalue_constraint='production',
                             significance=0.01,
                             verbose=False):
 
-    family, constraint_type = model.split('-')
+    family, ct = model.split('-')
 
-    if family == 'gravity' and constraint_type == 'doubly':
-        c, *other = locs.gravity_calibrate_nonlinear(constraint_type='doubly')
+    pvalue_ct = 'production' if ct == 'doubly' else ct
+    # we default to production for the pvalues for the DC model
+
+    if family == 'gravity' and ct == 'production':
+        c, *other, b = locs.gravity_calibrate_nonlinear(constraint_type=ct)
+        fmat = locs.gravity_matrix(c, α=0, β=b)
+
+    elif family == 'gravity' and ct == 'attraction':
+        c, a, *other = locs.gravity_calibrate_nonlinear(constraint_type=ct)
+        fmat = locs.gravity_matrix(c, α=a, β=0)
+
+    elif family == 'gravity' and ct == 'doubly':
+        c, *other = locs.gravity_calibrate_nonlinear(constraint_type=ct)
         fmat = locs.gravity_matrix(c, α=0, β=0)
-        T_model = locs.constrained_model(fmat, 'doubly', verbose=verbose)
+
     else:
         raise NotImplementedError
 
-    pmat = locs.probability_matrix(T_model, pvalue_constraint)
-    pvals = locs.pvalues_exact(pmat, constraint_type=pvalue_constraint) < significance
-    idx_plus = pvals[:, 0]
+    T_model = locs.constrained_model(fmat, ct, verbose=verbose)
+    pmat = locs.probability_matrix(T_model, pvalue_ct)
+    pvals = locs.pvalues_exact(pmat, constraint_type=pvalue_ct)
+    idx_plus = pvals[:, 0] < significance
 
     out = build_graph(locs.data, idx_plus, coords=coords, directed=True)
 
