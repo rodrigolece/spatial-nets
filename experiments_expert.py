@@ -10,7 +10,7 @@ import utils
 
 
 
-def grav_experiment(n, rho, lamb, gamma=2.0,
+def grav_experiment(N, rho, lamb, gamma=2.0,
                     model='gravity-doubly',
                     pvalue_constraint='production',
                     nb_repeats=10,
@@ -23,7 +23,7 @@ def grav_experiment(n, rho, lamb, gamma=2.0,
     out = np.zeros((nb_repeats * nb_net_repeats, 5))  # overlap, nmi, vi, b, entropy
 
     for k in range(nb_net_repeats):
-        coords, comm_vec, mat = utils.benchmark_expert(n, rho, lamb, gamma=gamma, seed=k)
+        coords, comm_vec, mat = utils.benchmark_expert(N, rho, lamb, gamma=gamma, seed=k)
         bench = utils.build_weighted_graph(mat,
                                            coords=coords,
                                            vertex_properties={'b': comm_vec},
@@ -45,8 +45,9 @@ def grav_experiment(n, rho, lamb, gamma=2.0,
             state = gt.minimize_blockmodel_dl(graph, **kwargs)
             ov = gt.partition_overlap(x, state.b.a, norm=True)
             vi = gt.variation_information(x, state.b.a, norm=True)
-            nmi = gt.mutual_information(x, state.b.a, norm=True) * n  # bug in graph-tool's nmi
-            out[k+i] = ov, vi, nmi, state.get_nonempty_B(), state.entropy()
+            nmi = gt.mutual_information(x, state.b.a, norm=True) * N  # bug in graph-tool's nmi
+            row = k*nb_repeats + i
+            out[row] = ov, vi, nmi, state.get_nonempty_B(), state.entropy()
 
     return out
 
@@ -130,17 +131,17 @@ if __name__ == '__main__':
         'nmi_std': nmi_std,
     }
 
+    if not fixB:
+        save_dict.update({
+            'Bs': Bs,
+            'Bs_std': Bs_std,
+        })
+
     if nb_net_repeats == 1:
         save_dict.update({
             'overlap_best': overlap_best,
             'vi_best': vi_best,
             'nmi_best': nmi_best,
-        })
-
-    if not fixB:
-        save_dict.update({
-            'Bs': Bs,
-            'Bs_std': Bs_std,
             'Bs_best': Bs_best,
         })
 
