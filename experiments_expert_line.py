@@ -47,7 +47,7 @@ if __name__ == '__main__':
         std[0][j], std[1][j], std[2][j], std[3][j] = std_res
         best[0][j], best[1][j], best[2][j], best[3][j] = best_res
 
-        mn_res, std_res, best_res = summarise_results(res)
+        mn_res, std_res, best_res = summarise_results(res_fix)
         mn_fix[0][j], mn_fix[1][j], mn_fix[2][j], mn_fix[3][j] = mn_res
         std_fix[0][j], std_fix[1][j], std_fix[2][j], std_fix[3][j] = std_res
         best_fix[0][j], best_fix[1][j], best_fix[2][j], best_fix[3][j] = best_res

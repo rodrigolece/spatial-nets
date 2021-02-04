@@ -113,7 +113,7 @@ if __name__ == '__main__':
             std[0][i,j], std[1][i,j], std[2][i,j], std[3][i,j] = std_res
             best[0][i,j], best[1][i,j], best[2][i,j], best[3][i,j] = best_res
 
-            mn_res, std_res, best_res = summarise_results(res)
+            mn_res, std_res, best_res = summarise_results(res_fix)
             mn_fix[0][i,j], mn_fix[1][i,j], mn_fix[2][i,j], mn_fix[3][i,j] = mn_res
             std_fix[0][i,j], std_fix[1][i,j], std_fix[2][i,j], std_fix[3][i,j] = std_res
             best_fix[0][i,j], best_fix[1][i,j], best_fix[2][i,j], best_fix[3][i,j] = best_res
