@@ -5,8 +5,9 @@ import numpy as np
 from tabulate import tabulate
 from tqdm import tqdm
 
-from locations import *
-import utils
+from spatial_nets.models.locations import *
+from spatial_nets.models import utils
+
 
 parser = argparse.ArgumentParser(description='Parse input files')
 

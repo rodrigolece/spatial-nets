@@ -9,7 +9,7 @@ import textwrap
 from tabulate import tabulate
 from typing import Dict, Tuple, Optional
 
-import utils
+from . import utils
 
 Array = np.array
 OptionalFloat = Optional[float]

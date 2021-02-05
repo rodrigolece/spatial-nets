@@ -1,6 +1,5 @@
-import os
-from pathlib import Path
 import argparse
+from pathlib import Path
 import numpy as np
 import graph_tool.all as gt
 from tqdm import tqdm
@@ -8,8 +7,7 @@ from tqdm import tqdm
 from expert import grav_experiment, summarise_results
 
 
-if __name__ == '__main__':
-    output_dir = Path('output_expert')
+def main(output_dir):
 
     parser = argparse.ArgumentParser()
     parser.add_argument('model')
@@ -17,6 +15,7 @@ if __name__ == '__main__':
     parser.add_argument('nb_net_repeats', type=int)
     parser.add_argument('-m', type=int, default=20)
     parser.add_argument('-s', '--globalseed', type=int, default=0)
+    parser.add_argument('--nosave', action='store_true')  # for testing
     # parser.add_argument('-B', '--fixB', action='store_true')
 
     args = parser.parse_args()
@@ -93,13 +92,19 @@ if __name__ == '__main__':
             'nmi_best': best_fix[2]
         })
 
-    filename = f'lamb_{model}_{nb_repeats}_{nb_net_repeats}.npz'
-    print(f'\nWriting results to {filename}')
-    np.savez(output_dir / filename, **save_dict)
+    if not args.nosave:
+        filename = f'lamb_{model}_{nb_repeats}_{nb_net_repeats}.npz'
+        print(f'\nWriting results to {filename}')
+        np.savez(output_dir / filename, **save_dict)
 
-    filename = f'lamb_fixB_{model}_{nb_repeats}_{nb_net_repeats}.npz'
-    print(f'Writing results with fixed B to {filename}')
-    np.savez(output_dir / filename, **save_dict_fix)
+        filename = f'lamb_fixB_{model}_{nb_repeats}_{nb_net_repeats}.npz'
+        print(f'Writing results with fixed B to {filename}')
+        np.savez(output_dir / filename, **save_dict_fix)
 
     print('\nDone!\n')
+
+
+if __name__ == '__main__':
+    output_dir = Path('output_expert')
+    main(output_dir)
 
