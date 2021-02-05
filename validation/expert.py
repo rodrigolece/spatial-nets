@@ -75,7 +75,7 @@ def summarise_results(mat):
 
 
 if __name__ == '__main__':
-    output_dir = Path('output') / 'benchmark_expert'
+    output_dir = Path('output_expert')
 
     parser = argparse.ArgumentParser()
     parser.add_argument('model')

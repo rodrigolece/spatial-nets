@@ -1,0 +1,405 @@
+name,code
+Aberdeen City,S12000033
+Aberdeenshire,S12000034
+Adur,E41000244
+Allerdale,E41000065
+Amber Valley,E41000071
+Angus,S12000041
+Antrim,95AA
+Ards,95BB
+Argyll and Bute,S12000035
+Armagh,95CC
+Arun,E41000245
+Ashfield,E41000196
+Ashford,E41000137
+Aylesbury Vale,E41000056
+Babergh,E41000221
+Ballymena,95DD
+Ballymoney,95EE
+Banbridge,95FF
+Barking and Dagenham,E41000293
+Barnet,E41000294
+Barnsley,E41000272
+Barrow-in-Furness,E41000066
+Basildon,E41000098
+Basingstoke and Deane,E41000116
+Bassetlaw,E41000197
+Bath and North East Somerset,E41000022
+Bedford,E41000054
+Belfast,95GG
+Bexley,E41000295
+Birmingham,E41000281
+Blaby,E41000161
+Blackburn with Darwen,E41000008
+Blackpool,E41000009
+Blaenau Gwent,W40000017
+Bolsover,E41000072
+Bolton,E41000257
+Boston,E41000168
+Bournemouth,E41000028
+Bracknell Forest,E41000036
+Bradford,E41000288
+Braintree,E41000099
+Breckland,E41000175
+Brent,E41000296
+Brentwood,E41000100
+Bridgend,W40000012
+Brighton and Hove,E41000043
+"Bristol, City of",E41000023
+Broadland,E41000176
+Bromley,E41000297
+Bromsgrove,E41000251
+Broxbourne,E41000127
+Broxtowe,E41000198
+Burnley,E41000149
+Bury,E41000258
+Caerphilly,W40000016
+Calderdale,E41000289
+Cambridge,E41000060
+Camden,E41000298
+Cannock Chase,E41000213
+Canterbury,E41000138
+Cardiff,W40000014
+Carlisle,E41000067
+Carmarthenshire,W40000009
+Carrickfergus,95HH
+Castle Point,E41000101
+Castlereagh,95II
+Central Bedfordshire,E41000055
+Ceredigion,W40000007
+Charnwood,E41000162
+Chelmsford,E41000102
+Cheltenham,E41000110
+Cherwell,E41000203
+Cheshire East,E41000049
+Cheshire West and Chester,E41000050
+Chesterfield,E41000073
+Chichester,E41000246
+Chiltern,E41000057
+Chorley,E41000150
+Christchurch,E41000087
+City of Edinburgh,S12000036
+Clackmannanshire,S12000005
+Colchester,E41000103
+Coleraine,95JJ
+Conwy,W40000003
+Cookstown,95KK
+Copeland,E41000068
+Corby,E41000182
+"Cornwall,Isles of Scilly",E41000052
+Cotswold,E41000111
+County Durham,E41000047
+Coventry,E41000282
+Craigavon,95LL
+Craven,E41000189
+Crawley,E41000247
+Croydon,E41000299
+Dacorum,E41000128
+Darlington,E41000005
+Dartford,E41000139
+Daventry,E41000183
+Denbighshire,W40000004
+Derby,E41000015
+Derbyshire Dales,E41000074
+Derry,95MM
+Doncaster,E41000273
+Dover,E41000140
+Down,95NN
+Dudley,E41000283
+Dumfries and Galloway,S12000006
+Dundee City,S12000042
+Dungannon,95OO
+Ealing,E41000300
+East Ayrshire,S12000008
+East Cambridgeshire,E41000061
+East Devon,E41000079
+East Dorset,E41000088
+East Dunbartonshire,S12000045
+East Hampshire,E41000117
+East Hertfordshire,E41000129
+East Lindsey,E41000169
+East Lothian,S12000010
+East Northamptonshire,E41000184
+East Renfrewshire,S12000011
+East Riding of Yorkshire,E41000011
+East Staffordshire,E41000214
+Eastbourne,E41000093
+Eastleigh,E41000118
+Eden,E41000069
+Eilean Siar,S12000013
+Elmbridge,E41000228
+Enfield,E41000301
+Epping Forest,E41000104
+Epsom and Ewell,E41000229
+Erewash,E41000075
+Exeter,E41000080
+Falkirk,S12000014
+Fareham,E41000119
+Fenland,E41000062
+Fermanagh,95PP
+Fife,S12000015
+Flintshire,W40000005
+Forest Heath,E41000222
+Forest of Dean,E41000112
+Fylde,E41000151
+Gateshead,E41000276
+Gedling,E41000199
+Glasgow City,S12000046
+Gloucester,E41000113
+Gosport,E41000120
+Gravesham,E41000141
+Great Yarmouth,E41000177
+Greenwich,E41000302
+Guildford,E41000230
+Gwynedd,W40000002
+Hackney,E41000303
+Halton,E41000006
+Hambleton,E41000190
+Hammersmith and Fulham,E41000304
+Harborough,E41000163
+Haringey,E41000305
+Harlow,E41000105
+Harrogate,E41000191
+Harrow,E41000306
+Hart,E41000121
+Hartlepool,E41000001
+Hastings,E41000094
+Havant,E41000122
+Havering,E41000307
+"Herefordshire, County of",E41000019
+Hertsmere,E41000130
+High Peak,E41000076
+Highland,S12000017
+Hillingdon,E41000308
+Hinckley and Bosworth,E41000164
+Horsham,E41000248
+Hounslow,E41000309
+Huntingdonshire,E41000063
+Hyndburn,E41000152
+Inverclyde,S12000018
+Ipswich,E41000223
+Isle of Anglesey,W40000001
+Isle of Wight,E41000046
+Islington,E41000310
+Kensington and Chelsea,E41000311
+Kettering,E41000185
+King's Lynn and West Norfolk,E41000178
+"Kingston upon Hull, City of",E41000010
+Kingston upon Thames,E41000312
+Kirklees,E41000290
+Knowsley,E41000267
+Lambeth,E41000313
+Lancaster,E41000153
+Larne,95QQ
+Leeds,E41000291
+Leicester,E41000016
+Lewes,E41000095
+Lewisham,E41000314
+Lichfield,E41000215
+Limavady,95RR
+Lincoln,E41000170
+Lisburn,95SS
+Liverpool,E41000268
+Luton,E41000032
+Magherafelt,95TT
+Maidstone,E41000142
+Maldon,E41000106
+Malvern Hills,E41000252
+Manchester,E41000259
+Mansfield,E41000200
+Medway,E41000035
+Melton,E41000165
+Mendip,E41000208
+Merthyr Tydfil,W40000022
+Merton,E41000315
+Mid Devon,E41000081
+Mid Suffolk,E41000224
+Mid Sussex,E41000249
+Middlesbrough,E41000002
+Midlothian,S12000019
+Milton Keynes,E41000042
+Mole Valley,E41000231
+Monmouthshire,W40000019
+Moray,S12000020
+Moyle,95UU
+Neath Port Talbot,W40000011
+New Forest,E41000123
+Newark and Sherwood,E41000201
+Newcastle upon Tyne,E41000277
+Newcastle-under-Lyme,E41000216
+Newham,E41000316
+Newport,W40000020
+Newry and Mourne,95VV
+Newtownabbey,95WW
+North Ayrshire,S12000021
+North Devon,E41000082
+North Dorset,E41000089
+North Down,95XX
+North East Derbyshire,E41000077
+North East Lincolnshire,E41000012
+North Hertfordshire,E41000131
+North Kesteven,E41000171
+North Lanarkshire,S12000044
+North Lincolnshire,E41000013
+North Norfolk,E41000179
+North Somerset,E41000024
+North Tyneside,E41000278
+North Warwickshire,E41000239
+North West Leicestershire,E41000166
+Northampton,E41000186
+Northumberland,E41000048
+Norwich,E41000180
+Nottingham,E41000018
+Nuneaton and Bedworth,E41000240
+Oadby and Wigston,E41000167
+Oldham,E41000260
+Omagh,95YY
+Orkney Islands,S12000023
+Oxford,E41000204
+Pembrokeshire,W40000008
+Pendle,E41000154
+Perth and Kinross,S12000024
+Peterborough,E41000031
+Plymouth,E41000026
+Poole,E41000029
+Portsmouth,E41000044
+Powys,W40000021
+Preston,E41000155
+Purbeck,E41000090
+Reading,E41000038
+Redbridge,E41000317
+Redcar and Cleveland,E41000003
+Redditch,E41000253
+Reigate and Banstead,E41000232
+Renfrewshire,S12000038
+Rhondda Cynon Taf,W40000015
+Ribble Valley,E41000156
+Richmond upon Thames,E41000318
+Richmondshire,E41000192
+Rochdale,E41000261
+Rochford,E41000107
+Rossendale,E41000157
+Rother,E41000096
+Rotherham,E41000274
+Rugby,E41000241
+Runnymede,E41000233
+Rushcliffe,E41000202
+Rushmoor,E41000124
+Rutland,E41000017
+Ryedale,E41000193
+Salford,E41000262
+Sandwell,E41000284
+Scarborough,E41000194
+Scottish Borders,S12000026
+Sedgemoor,E41000209
+Sefton,E41000270
+Selby,E41000195
+Sevenoaks,E41000143
+Sheffield,E41000275
+Shepway,E41000144
+Shetland Islands,S12000027
+Shropshire,E41000051
+Slough,E41000039
+Solihull,E41000285
+South Ayrshire,S12000028
+South Bucks,E41000058
+South Cambridgeshire,E41000064
+South Derbyshire,E41000078
+South Gloucestershire,E41000025
+South Hams,E41000083
+South Holland,E41000172
+South Kesteven,E41000173
+South Lakeland,E41000070
+South Lanarkshire,S12000029
+South Norfolk,E41000181
+South Northamptonshire,E41000187
+South Oxfordshire,E41000205
+South Ribble,E41000158
+South Somerset,E41000210
+South Staffordshire,E41000217
+South Tyneside,E41000279
+Southampton,E41000045
+Southend-on-Sea,E41000033
+Southwark,E41000319
+Spelthorne,E41000234
+St Albans,E41000132
+St Edmundsbury,E41000225
+St. Helens,E41000269
+Stafford,E41000218
+Staffordshire Moorlands,E41000219
+Stevenage,E41000133
+Stirling,S12000030
+Stockport,E41000263
+Stockton-on-Tees,E41000004
+Stoke-on-Trent,E41000021
+Strabane,95ZZ
+Stratford-on-Avon,E41000242
+Stroud,E41000114
+Suffolk Coastal,E41000226
+Sunderland,E41000280
+Surrey Heath,E41000235
+Sutton,E41000320
+Swale,E41000145
+Swansea,W40000010
+Swindon,E41000030
+Tameside,E41000264
+Tamworth,E41000220
+Tandridge,E41000236
+Taunton Deane,E41000211
+Teignbridge,E41000084
+Telford and Wrekin,E41000020
+Tendring,E41000108
+Test Valley,E41000125
+Tewkesbury,E41000115
+Thanet,E41000146
+Three Rivers,E41000134
+Thurrock,E41000034
+Tonbridge and Malling,E41000147
+Torbay,E41000027
+Torfaen,W40000018
+Torridge,E41000085
+Tower Hamlets,E41000321
+Trafford,E41000265
+Tunbridge Wells,E41000148
+Uttlesford,E41000109
+Vale of Glamorgan,W40000013
+Vale of White Horse,E41000206
+Wakefield,E41000292
+Walsall,E41000286
+Waltham Forest,E41000322
+Wandsworth,E41000323
+Warrington,E41000007
+Warwick,E41000243
+Watford,E41000135
+Waveney,E41000227
+Waverley,E41000237
+Wealden,E41000097
+Wellingborough,E41000188
+Welwyn Hatfield,E41000136
+West Berkshire,E41000037
+West Devon,E41000086
+West Dorset,E41000091
+West Dunbartonshire,S12000039
+West Lancashire,E41000159
+West Lindsey,E41000174
+West Lothian,S12000040
+West Oxfordshire,E41000207
+West Somerset,E41000212
+"Westminster,City of London",E41000324
+Weymouth and Portland,E41000092
+Wigan,E41000266
+Wiltshire,E41000053
+Winchester,E41000126
+Windsor and Maidenhead,E41000040
+Wirral,E41000271
+Woking,E41000238
+Wokingham,E41000041
+Wolverhampton,E41000287
+Worcester,E41000254
+Worthing,E41000250
+Wrexham,W40000006
+Wychavon,E41000255
+Wycombe,E41000059
+Wyre,E41000160
+Wyre Forest,E41000256
+York,E41000014

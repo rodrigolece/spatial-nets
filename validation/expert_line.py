@@ -5,11 +5,11 @@ import numpy as np
 import graph_tool.all as gt
 from tqdm import tqdm
 
-from experiments_expert import grav_experiment, summarise_results
+from expert import grav_experiment, summarise_results
 
 
 if __name__ == '__main__':
-    output_dir = Path('output') / 'benchmark_expert'
+    output_dir = Path('output_expert')
 
     parser = argparse.ArgumentParser()
     parser.add_argument('model')
