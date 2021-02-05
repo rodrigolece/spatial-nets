@@ -16,6 +16,7 @@ def grav_experiment(N, rho, lamb, gamma=2.0,
                     nb_repeats=10,
                     nb_net_repeats=2,
                     significance=0.01,
+                    start_seed=0,
                     verbose=False
                    ):
 
@@ -23,7 +24,9 @@ def grav_experiment(N, rho, lamb, gamma=2.0,
     out_fix = np.zeros_like(out)
 
     for k in range(nb_net_repeats):
-        coords, comm_vec, mat = utils.benchmark_expert(N, rho, lamb, gamma=gamma, seed=k)
+        coords, comm_vec, mat = utils.benchmark_expert(N, rho, lamb,
+                                                       gamma=gamma,
+                                                       seed=start_seed + k)
         bench = utils.build_weighted_graph(mat,
                                            coords=coords,
                                            vertex_properties={'b': comm_vec},
@@ -80,6 +83,7 @@ if __name__ == '__main__':
     parser.add_argument('nb_net_repeats', type=int)
     parser.add_argument('-n', type=int, default=20)
     parser.add_argument('-m', type=int, default=20)
+    parser.add_argument('-s', '--globalseed', type=int, default=0)
     # parser.add_argument('-B', '--fixB', action='store_true')
 
     args = parser.parse_args()
@@ -88,6 +92,7 @@ if __name__ == '__main__':
     nb_repeats = args.nb_repeats
     nb_net_repeats = args.nb_net_repeats
     n, m = args.n, args.m
+    global_seed = args.globalseed
     N = 100  # nb of nodes
 
     r = np.logspace(0, 2, n)
@@ -106,7 +111,8 @@ if __name__ == '__main__':
         for j in range(m):
             res, res_fix = grav_experiment(N, rho[i,j], lamb[i,j], model=model,
                                            nb_repeats=nb_repeats,
-                                           nb_net_repeats=nb_net_repeats)
+                                           nb_net_repeats=nb_net_repeats,
+                                           start_seed=global_seed)
 
             mn_res, std_res, best_res = summarise_results(res)
             mn[0][i,j], mn[1][i,j], mn[2][i,j], mn[3][i,j] = mn_res

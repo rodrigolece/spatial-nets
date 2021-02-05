@@ -15,7 +15,8 @@ if __name__ == '__main__':
     parser.add_argument('model')
     parser.add_argument('nb_repeats', type=int)
     parser.add_argument('nb_net_repeats', type=int)
-    parser.add_argument('-m', type=int, default=50)
+    parser.add_argument('-m', type=int, default=20)
+    parser.add_argument('-s', '--globalseed', type=int, default=0)
     # parser.add_argument('-B', '--fixB', action='store_true')
 
     args = parser.parse_args()
@@ -24,6 +25,7 @@ if __name__ == '__main__':
     nb_repeats = args.nb_repeats
     nb_net_repeats = args.nb_net_repeats
     m = args.m
+    global_seed = args.globalseed
     N = 100  # nb_of nodes
     rho = 100
 
@@ -40,7 +42,8 @@ if __name__ == '__main__':
     for j in tqdm(range(m)):
         res, res_fix = grav_experiment(N, rho, lamb[j], model=model,
                                        nb_repeats=nb_repeats,
-                                       nb_net_repeats=nb_net_repeats)
+                                       nb_net_repeats=nb_net_repeats,
+                                       start_seed=global_seed)
 
         mn_res, std_res, best_res = summarise_results(res)
         mn[0][j], mn[1][j], mn[2][j], mn[3][j] = mn_res
