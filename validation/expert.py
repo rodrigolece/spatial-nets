@@ -4,8 +4,8 @@ import numpy as np
 import graph_tool.all as gt
 from tqdm import tqdm
 
-from spatial_nets.models.locations import DataLocations
-from spatial_nets.models import utils
+from spatial_nets.locations import DataLocations
+from spatial_nets import utils
 
 
 def grav_experiment(N, rho, lamb, gamma=2.0,

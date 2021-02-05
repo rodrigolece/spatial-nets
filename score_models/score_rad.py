@@ -5,8 +5,8 @@ import numpy as np
 from tabulate import tabulate
 from tqdm import tqdm
 
-from spatial_nets.models.locations import *
-from spatial_nets.models import utils
+from spatial_nets.locations import *
+from spatial_nets import utils
 
 
 parser = argparse.ArgumentParser(description='Parse input files')
@@ -18,10 +18,6 @@ parser.add_argument('dmat_file', help='The file constaining the distance matrix'
 # Optional arguments
 parser.add_argument('-c', '--usecoords', action='store_true',
                     help='use coords instead of distance matrix')
-parser.add_argument('-f', '--fun', type=str, default='nonlinear',
-                    help='Param. calibration method')
-parser.add_argument('-l', '--log', action='store_true',
-                    help='Call calibration method with option use_log=True')
 parser.add_argument('-e', '--exact', action='store_true',
                     help='Use exact calculation of p-values')
 parser.add_argument('-s', '--significance', type=float, default=0.01,
@@ -40,7 +36,6 @@ if output_file:
     assert (ext := os.path.splitext(output_file)[1]) == '.npz', \
             f"invalid file extension {ext}; use '.npz'"
 
-assert args.fun in ('nonlinear', 'cpc', 'all'), f'invalid calibration method {args.fun}'
 assert sig > 0, 'significance should be positive'
 
 #flow_file = os.path.join('data', 'UK_commute2011.npz')
@@ -63,16 +58,7 @@ else:
     print(f"\nReading distance matrix from '{os.path.basename(dmat_file)}'")
     dmat = utils.load_dmat(dmat_file)
 
-print(f"\nParam. calibration method: '{args.fun}'")
-
-if args.log:
-    kwargs = dict(use_log=True)
-    print('\nUsing log-loss function')
-else:
-    kwargs = {}
-
 locs = DataLocations(dmat, T_data)
-method = getattr(locs, f'gravity_calibrate_{args.fun}')
 
 
 # Start the calculations proper
