@@ -1,11 +1,13 @@
 import os
 from pathlib import Path
+import collections
 import warnings
 import numpy as np
 import pandas as pd
 import scipy.sparse as sp
 from scipy.io import loadmat
 from typing import List, Union
+from collections.abc import Iterable
 
 import graph_tool as gt
 
@@ -17,6 +19,14 @@ from sklearn.metrics import pairwise
 #    'load_dmat', 'load_flows',
 #    'benchmark_cerina', 'greatcircle_distance'
 #]
+
+
+def _get_iterable(x):
+    """Utility function."""
+    if isinstance(x, collections.Iterable) and not isinstance(x, str):
+        return x
+    else:
+        return (x,)
 
 
 def build_graph(mat, idx=None, directed=True, coords=None, vertex_properties={}):
@@ -260,13 +270,32 @@ def benchmark_cerina(nb_nodes, edge_density, l, beta, epsilon, L=1.0, seed=0):
     # more useful values in atrribute vector
     comm_vec[N // 2:] = 0
 
+    # TODO: return symmetric mat
     return coords, np.squeeze(comm_vec), mat
 
 
-def benchmark_expert(nb_nodes, edge_density, lamb, gamma=2, L=100.0, seed=0):
+def benchmark_expert(
+        nb_nodes,
+        edge_density,
+        lamb,
+        gamma=2,
+        L=100.0,
+        directed=False,
+        seed=0
+    ):
     """Create a benchmark network of the type proposed by Expert et al."""
+    lamb = _get_iterable(lamb)
+    if directed:
+        assert len(lamb) == 2
+    else:
+        assert len(lamb) == 1, \
+                'lamb should be scalar for undirected network'
+
     N = nb_nodes
-    nb_edges = N * (N - 1) * edge_density // 2
+
+    nb_edges = int(N * (N - 1) * edge_density )
+    if not directed:
+        nb_edges //= 2
 
     rng = np.random.RandomState(seed)
 
@@ -275,16 +304,27 @@ def benchmark_expert(nb_nodes, edge_density, lamb, gamma=2, L=100.0, seed=0):
 
     # Attibute assignment
     comm_vec = np.ones(N, dtype=int)
-    comm_vec[N // 2:] = -1  # helpful for checking same/diff comm
+    n = N // 2
+    comm_vec[n:] = -1  # helpful for checking same/diff comm
 
     # Edge selection
     smat = (comm_vec * comm_vec[:, np.newaxis]).astype(float)
     # smat[smat == 1] = 1
-    smat[smat == -1] = lamb
+
+    if directed:
+        smat[:n, n:] = lamb[0]
+        smat[n:, :n] = lamb[1]
+    else:
+        smat[smat == -1] = lamb[0]
 
     dmat = pairwise.euclidean_distances(coords)
 
-    i, j = np.triu_indices_from(smat, k=1)  # keep i < j
+    i, j = np.triu_indices_from(smat, k=1)  # i < j
+    if directed:
+        k, l = np.tril_indices_from(smat, k=-1)  # i > j
+        i = np.concatenate((i, k))
+        j = np.concatenate((j, l))
+
     probas = smat[i, j] / (dmat[i, j]**gamma)
     probas /= probas.sum()  # normalization
 
@@ -292,10 +332,13 @@ def benchmark_expert(nb_nodes, edge_density, lamb, gamma=2, L=100.0, seed=0):
     idx, = draw.nonzero()
     mat = sp.coo_matrix((draw[idx], (i[idx], j[idx])), shape=(N, N))
 
+    if not directed:
+        mat = (mat + mat.T).tocoo()  # addition changes to csr
+
     # more useful values in atrribute vector
     comm_vec[N // 2:] = 0
 
-    return coords, np.squeeze(comm_vec), mat
+    return coords, comm_vec, mat
 
 
 def greatcircle_distance(long1, lat1, long2, lat2, R=6371):

@@ -14,6 +14,7 @@ def main(output_dir):
     parser.add_argument('nb_repeats', type=int)
     parser.add_argument('nb_net_repeats', type=int)
     parser.add_argument('-m', type=int, default=20)
+    parser.add_argument('--directed', action='store_true')
     parser.add_argument('-s', '--globalseed', type=int, default=0)
     parser.add_argument('--nosave', action='store_true')  # for testing
     # parser.add_argument('-B', '--fixB', action='store_true')
@@ -24,6 +25,7 @@ def main(output_dir):
     nb_repeats = args.nb_repeats
     nb_net_repeats = args.nb_net_repeats
     m = args.m
+    directed = args.directed
     global_seed = args.globalseed
     N = 100  # nb_of nodes
     rho = 100
@@ -38,11 +40,20 @@ def main(output_dir):
     std_fix = [np.zeros_like(lamb) for _ in range(4)]
     best_fix = [np.zeros_like(lamb) for _ in range(4)]
 
+    if directed:
+        lamb_12 = np.minimum(lamb + 0.1, 1.0)
+        lamb_21 = np.maximum(lamb - 0.1, 0.0)
+        lamb = np.stack((lamb_12, lamb_21), axis=1)
+
     for j in tqdm(range(m)):
-        res, res_fix = grav_experiment(N, rho, lamb[j], model=model,
-                                       nb_repeats=nb_repeats,
-                                       nb_net_repeats=nb_net_repeats,
-                                       start_seed=global_seed)
+        res, res_fix = grav_experiment(
+            N, rho, lamb[j],
+            model=model,
+            nb_repeats=nb_repeats,
+            nb_net_repeats=nb_net_repeats,
+            start_seed=global_seed,
+            directed=directed
+        )
 
         mn_res, std_res, best_res = summarise_results(res)
         mn[0][j], mn[1][j], mn[2][j], mn[3][j] = mn_res
@@ -93,11 +104,12 @@ def main(output_dir):
         })
 
     if not args.nosave:
-        filename = f'lamb_{model}_{nb_repeats}_{nb_net_repeats}.npz'
+        dir_name = 'directed_' if directed else ''
+        filename = f'{dir_name}lamb_{model}_{nb_repeats}_{nb_net_repeats}.npz'
         print(f'\nWriting results to {filename}')
         np.savez(output_dir / filename, **save_dict)
 
-        filename = f'lamb_fixB_{model}_{nb_repeats}_{nb_net_repeats}.npz'
+        filename = f'{dir_name}lamb_fixB_{model}_{nb_repeats}_{nb_net_repeats}.npz'
         print(f'Writing results with fixed B to {filename}')
         np.savez(output_dir / filename, **save_dict_fix)
 

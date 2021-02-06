@@ -15,6 +15,7 @@ def grav_experiment(N, rho, lamb, gamma=2.0,
                     nb_net_repeats=2,
                     significance=0.01,
                     start_seed=0,
+                    directed=False,
                     verbose=False
                    ):
 
@@ -22,25 +23,33 @@ def grav_experiment(N, rho, lamb, gamma=2.0,
     out_fix = np.zeros_like(out)
 
     for k in range(nb_net_repeats):
-        coords, comm_vec, mat = utils.benchmark_expert(N, rho, lamb,
-                                                       gamma=gamma,
-                                                       seed=start_seed + k)
-        bench = utils.build_weighted_graph(mat,
-                                           coords=coords,
-                                           vertex_properties={'b': comm_vec},
-                                           directed=False)  # the default
+        coords, comm_vec, coo_mat = utils.benchmark_expert(
+            N, rho, lamb,
+            gamma=gamma,
+            seed=start_seed + k,
+            directed=directed
+        )
 
-        t_data = gt.adjacency(bench, weight=bench.ep.weight).astype(int)
-        locs = DataLocations(coords, t_data)
-
-        # calculate the p-values to build the graph with positive edges
-        graph = utils.build_significant_graph(locs, coords,
-                                              significance=significance,
-                                              verbose=verbose)
+        bench = utils.build_weighted_graph(
+            coo_mat,
+            directed=directed,
+            coords=coords,
+            vertex_properties={'b': comm_vec}
+        )
 
         # the ground truth
         ground_truth = gt.BlockState(bench, b=bench.vp.b)
         x = ground_truth.b.a
+
+        # calculate the p-values to build the graph with positive edges
+        T_data = coo_mat.tocsr()
+        locs = DataLocations(coords, T_data)
+
+        graph = utils.build_significant_graph(
+            locs, coords,
+            significance=significance,
+            verbose=verbose
+        )
 
         for i in range(nb_repeats):
             row = k*nb_repeats + i
@@ -79,6 +88,7 @@ def main(output_dir):
     parser.add_argument('nb_net_repeats', type=int)
     parser.add_argument('-n', type=int, default=20)
     parser.add_argument('-m', type=int, default=20)
+    parser.add_argument('--directed', action='store_true')
     parser.add_argument('-s', '--globalseed', type=int, default=0)
     parser.add_argument('--nosave', action='store_true')  # for testing
     # parser.add_argument('-B', '--fixB', action='store_true')
@@ -89,6 +99,7 @@ def main(output_dir):
     nb_repeats = args.nb_repeats
     nb_net_repeats = args.nb_net_repeats
     n, m = args.n, args.m
+    directed = args.directed
     global_seed = args.globalseed
     N = 100  # nb of nodes
 
@@ -104,12 +115,21 @@ def main(output_dir):
     std_fix = [np.zeros_like(rho) for _ in range(4)]
     best_fix = [np.zeros_like(rho) for _ in range(4)]
 
+    if directed:
+        lamb_12 = np.minimum(lamb + 0.1, 1.0)
+        lamb_21 = np.maximum(lamb - 0.1, 0.0)
+        lamb = np.stack((lamb_12, lamb_21), axis=2)
+
     for i in tqdm(range(n)):
         for j in range(m):
-            res, res_fix = grav_experiment(N, rho[i,j], lamb[i,j], model=model,
-                                           nb_repeats=nb_repeats,
-                                           nb_net_repeats=nb_net_repeats,
-                                           start_seed=global_seed)
+            res, res_fix = grav_experiment(
+                N, rho[i,j], lamb[i,j],
+                model=model,
+                nb_repeats=nb_repeats,
+                nb_net_repeats=nb_net_repeats,
+                start_seed=global_seed,
+                directed=directed
+            )
 
             mn_res, std_res, best_res = summarise_results(res)
             mn[0][i,j], mn[1][i,j], mn[2][i,j], mn[3][i,j] = mn_res
@@ -160,11 +180,12 @@ def main(output_dir):
         })
 
     if not args.nosave:
-        filename = f'rho-lamb_{model}_{nb_repeats}_{nb_net_repeats}.npz'
+        dir_name = 'directed_' if directed else ''
+        filename = f'{dir_name}rho-lamb_{model}_{nb_repeats}_{nb_net_repeats}.npz'
         print(f'\nWriting results to {filename}')
         np.savez(output_dir / filename, **save_dict)
 
-        filename = f'rho-lamb_fixB_{model}_{nb_repeats}_{nb_net_repeats}.npz'
+        filename = f'{dir_name}rho-lamb_fixB_{model}_{nb_repeats}_{nb_net_repeats}.npz'
         print(f'Writing results with fixed B to {filename}')
         np.savez(output_dir / filename, **save_dict_fix)
 
