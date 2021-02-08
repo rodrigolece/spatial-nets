@@ -232,15 +232,27 @@ def sparsemat_remove_diag(spmat):
 #     return df
 
 
-def benchmark_cerina(nb_nodes, edge_density, l, beta, epsilon, L=1.0, seed=0):
+def benchmark_cerina(
+        nb_nodes,
+        edge_density,
+        ell,
+        beta,
+        epsilon,
+        L=1.0,
+        directed=False,
+        seed=0
+    ):
     """Create a benchmark network of the type proposed by Cerina et al."""
     N = nb_nodes
-    nb_edges = N * (N - 1) * edge_density // 2
+
+    nb_edges = int(N * (N - 1) * edge_density)
+    if not directed:
+        nb_edges //= 2
 
     rng = np.random.RandomState(seed)
 
     # Coordinates
-    ds = rng.exponential(scale=l, size=N)
+    ds = rng.exponential(scale=ell, size=N)
     alphas = 2 * np.pi * rng.rand(N)
     shift = L * np.ones(N)
     shift[N // 2:] *= -1
@@ -253,18 +265,24 @@ def benchmark_cerina(nb_nodes, edge_density, l, beta, epsilon, L=1.0, seed=0):
     idx_plane = xs > 0
     idx_success = rng.rand(N) < 1 - epsilon
 
-    comm_vec = np.zeros((N, 1), dtype=int)  # column vector
+    n = N // 2
+    comm_vec = np.zeros(N, dtype=int)
     comm_vec[np.bitwise_and(idx_plane, idx_success)] = 1
     comm_vec[np.bitwise_and(idx_plane, ~idx_success)] = -1
     comm_vec[np.bitwise_and(~idx_plane, idx_success)] = -1
     comm_vec[np.bitwise_and(~idx_plane, ~idx_success)] = 1
 
     # Edge selection
-    smat = comm_vec.T * comm_vec
+    smat = comm_vec * comm_vec[:, np.newaxis]
     dmat = pairwise.euclidean_distances(coords)
-    pmat = np.exp(beta * smat - dmat / l)
+    pmat = np.exp(beta * smat - dmat / ell)
 
-    i, j = np.triu_indices_from(pmat, k=1)  # keep i < j
+    i, j = np.triu_indices_from(pmat, k=1)  # i < j
+    if directed:
+        r, s = np.tril_indices_from(smat, k=-1)  # i > j
+        i = np.concatenate((i, r))
+        j = np.concatenate((j, s))
+
     probas = pmat[i, j]
     probas /= probas.sum()  # normalization
 
@@ -272,11 +290,13 @@ def benchmark_cerina(nb_nodes, edge_density, l, beta, epsilon, L=1.0, seed=0):
     idx, = draw.nonzero()
     mat = sp.coo_matrix((draw[idx], (i[idx], j[idx])), shape=(N, N))
 
-    # more useful values in atrribute vector
-    comm_vec[N // 2:] = 0
+    if not directed:
+        mat = (mat + mat.T).tocoo()  # addition changes to csr
 
-    # TODO: return symmetric mat
-    return coords, np.squeeze(comm_vec), mat
+    # more useful values in atrribute vector
+    comm_vec[comm_vec == -1] = 0
+
+    return coords, comm_vec, mat
 
 
 def benchmark_expert(
