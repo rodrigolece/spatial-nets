@@ -31,6 +31,10 @@ def main(output_dir):
 
     lamb = np.linspace(0, 1.0, m)
 
+    # The save directories, before we modify lamb if the network is directed
+    save_dict = { 'lamb': lamb }
+    save_dict_fix = { 'lamb': lamb }
+
     mn = [np.zeros_like(lamb) for _ in range(4)]  # overlap, vi, nmi, Bs
     std = [np.zeros_like(lamb) for _ in range(4)]
     best = [np.zeros_like(lamb) for _ in range(4)]
@@ -64,9 +68,7 @@ def main(output_dir):
         std_fix[0][j], std_fix[1][j], std_fix[2][j], std_fix[3][j] = std_res
         best_fix[0][j], best_fix[1][j], best_fix[2][j], best_fix[3][j] = best_res
 
-    save_dict = {
-        'rho': rho,
-        'lamb': lamb,
+    save_dict.update({
         'overlap': mn[0],
         'overlap_std': std[0],
         'vi': mn[1],
@@ -75,10 +77,9 @@ def main(output_dir):
         'nmi_std': std[2],
         'Bs': mn[3],
         'Bs_std': std[3]
-    }
+    })
 
-    save_dict_fix = {
-        'rho': rho,
+    save_dict_fix.update({
         'lamb': lamb,
         'overlap': mn_fix[0],
         'overlap_std': std_fix[0],
@@ -86,7 +87,7 @@ def main(output_dir):
         'vi_std': std_fix[1],
         'nmi': mn_fix[2],
         'nmi_std': std_fix[2]
-    }
+    })
 
     if nb_net_repeats == 1:
         save_dict.update({

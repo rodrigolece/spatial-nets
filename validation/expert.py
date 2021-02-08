@@ -113,6 +113,10 @@ def main(output_dir):
     l = np.linspace(0.0, 1.0, m)
     rho, lamb = np.meshgrid(r, l)
 
+    # The save directories, before we modify lamb if the network is directed
+    save_dict = { 'rho': rho, 'lamb': lamb }
+    save_dict_fix = { 'rho': rho, 'lamb': lamb }
+
     mn = [np.zeros_like(rho) for _ in range(4)]  # overlap, vi, nmi, Bs
     std = [np.zeros_like(rho) for _ in range(4)]
     best = [np.zeros_like(rho) for _ in range(4)]
@@ -132,7 +136,7 @@ def main(output_dir):
                 N, rho[i,j], lamb[i,j], model,
                 nb_repeats=nb_repeats,
                 nb_net_repeats=nb_net_repeats,
-                start_seed=args.global_seed,
+                start_seed=args.globalseed,
                 directed=directed,
                 verbose=args.verbose
             )
@@ -147,9 +151,7 @@ def main(output_dir):
             std_fix[0][i,j], std_fix[1][i,j], std_fix[2][i,j], std_fix[3][i,j] = std_res
             best_fix[0][i,j], best_fix[1][i,j], best_fix[2][i,j], best_fix[3][i,j] = best_res
 
-    save_dict = {
-        'rho': rho,
-        'lamb': lamb,
+    save_dict.update({
         'overlap': mn[0],
         'overlap_std': std[0],
         'vi': mn[1],
@@ -158,18 +160,16 @@ def main(output_dir):
         'nmi_std': std[2],
         'Bs': mn[3],
         'Bs_std': std[3]
-    }
+    })
 
-    save_dict_fix = {
-        'rho': rho,
-        'lamb': lamb,
+    save_dict_fix.update({
         'overlap': mn_fix[0],
         'overlap_std': std_fix[0],
         'vi': mn_fix[1],
         'vi_std': std_fix[1],
         'nmi': mn_fix[2],
         'nmi_std': std_fix[2]
-    }
+    })
 
     if nb_net_repeats == 1:
         save_dict.update({
