@@ -55,6 +55,9 @@ def grav_experiment(
             verbose=verbose
         )
 
+        if verbose:
+            print(graph)
+
         for i in range(nb_repeats):
             row = k*nb_repeats + i
 
@@ -95,7 +98,7 @@ def main(output_dir):
     parser.add_argument('--directed', action='store_true')
     parser.add_argument('-s', '--globalseed', type=int, default=0)
     parser.add_argument('--nosave', action='store_true')  # for testing
-    # parser.add_argument('-B', '--fixB', action='store_true')
+    parser.add_argument('-v', '--verbose', action='store_true')
 
     args = parser.parse_args()
 
@@ -104,7 +107,6 @@ def main(output_dir):
     nb_net_repeats = args.nb_net_repeats
     n, m = args.n, args.m
     directed = args.directed
-    global_seed = args.globalseed
     N = 100  # nb of nodes
 
     r = np.logspace(0, 2, n)
@@ -130,8 +132,9 @@ def main(output_dir):
                 N, rho[i,j], lamb[i,j], model,
                 nb_repeats=nb_repeats,
                 nb_net_repeats=nb_net_repeats,
-                start_seed=global_seed,
-                directed=directed
+                start_seed=args.global_seed,
+                directed=directed,
+                verbose=args.verbose
             )
 
             mn_res, std_res, best_res = summarise_results(res)
