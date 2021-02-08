@@ -86,17 +86,21 @@ def build_significant_graph(locs,
     pvalue_ct = 'production' if ct == 'doubly' else ct
     # we default to production for the pvalues for the DC model
 
-    if family == 'gravity' and ct == 'production':
-        c, *other, b = locs.gravity_calibrate_nonlinear(constraint_type=ct)
-        fmat = locs.gravity_matrix(c, α=0, β=b)
+    if family == 'gravity':
+        if ct == 'production':
+            c, *other, b = locs.gravity_calibrate_nonlinear(constraint_type=ct)
+            fmat = locs.gravity_matrix(c, α=0, β=b)
 
-    elif family == 'gravity' and ct == 'attraction':
-        c, a, *other = locs.gravity_calibrate_nonlinear(constraint_type=ct)
-        fmat = locs.gravity_matrix(c, α=a, β=0)
+        elif ct == 'attraction':
+            c, a, *other = locs.gravity_calibrate_nonlinear(constraint_type=ct)
+            fmat = locs.gravity_matrix(c, α=a, β=0)
 
-    elif family == 'gravity' and ct == 'doubly':
-        c, *other = locs.gravity_calibrate_nonlinear(constraint_type=ct)
-        fmat = locs.gravity_matrix(c, α=0, β=0)
+        elif ct == 'doubly':
+            c, *other = locs.gravity_calibrate_nonlinear(constraint_type=ct)
+            fmat = locs.gravity_matrix(c, α=0, β=0)
+
+    elif family == 'radiation':
+        fmat = locs.radiation_matrix(finite_correction=False)
 
     else:
         raise NotImplementedError
