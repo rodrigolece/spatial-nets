@@ -47,8 +47,7 @@ def main(output_dir):
 
     for j in tqdm(range(m)):
         res, res_fix = grav_experiment(
-            N, rho, lamb[j],
-            model=model,
+            N, rho, lamb[j], model,
             nb_repeats=nb_repeats,
             nb_net_repeats=nb_net_repeats,
             start_seed=global_seed,

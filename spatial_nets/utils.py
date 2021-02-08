@@ -34,6 +34,7 @@ def build_graph(mat, idx=None, directed=True, coords=None, vertex_properties={})
     nb_nodes, _ = mat.shape
 
     i, j = mat.nonzero()
+    # TODO: could reuse i,j and avoid the else clause
     if idx is not None:
         ii, jj = i[idx], j[idx]
     else:
@@ -75,8 +76,8 @@ def build_graph(mat, idx=None, directed=True, coords=None, vertex_properties={})
 
 
 def build_significant_graph(locs,
-                            coords,
-                            model='gravity-doubly',
+                            model,
+                            coords=None,
                             significance=0.01,
                             verbose=False):
 

@@ -8,16 +8,18 @@ from spatial_nets.locations import DataLocations
 from spatial_nets import utils
 
 
-def grav_experiment(N, rho, lamb, gamma=2.0,
-                    model='gravity-doubly',
-                    pvalue_constraint='production',
-                    nb_repeats=10,
-                    nb_net_repeats=2,
-                    significance=0.01,
-                    start_seed=0,
-                    directed=False,
-                    verbose=False
-                   ):
+def grav_experiment(
+        N, rho, lamb,
+        model,
+        gamma=2.0,
+        pvalue_constraint='production',
+        nb_repeats=10,
+        nb_net_repeats=2,
+        significance=0.01,
+        start_seed=0,
+        directed=False,
+        verbose=False
+    ):
 
     out = np.zeros((nb_repeats * nb_net_repeats, 5))  # overlap, nmi, vi, b, entropy
     out_fix = np.zeros_like(out)
@@ -46,7 +48,9 @@ def grav_experiment(N, rho, lamb, gamma=2.0,
         locs = DataLocations(coords, T_data)
 
         graph = utils.build_significant_graph(
-            locs, coords,
+            locs,
+            model,
+            coords=coords,
             significance=significance,
             verbose=verbose
         )
@@ -123,8 +127,7 @@ def main(output_dir):
     for i in tqdm(range(n)):
         for j in range(m):
             res, res_fix = grav_experiment(
-                N, rho[i,j], lamb[i,j],
-                model=model,
+                N, rho[i,j], lamb[i,j], model,
                 nb_repeats=nb_repeats,
                 nb_net_repeats=nb_net_repeats,
                 start_seed=global_seed,
