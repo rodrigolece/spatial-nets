@@ -3,7 +3,7 @@
 
 # Activate conda environment; raises unbound error
 CONDA_BASE="$(conda info --base)"
-CONDA_ENV="gt"
+CONDA_ENV="gt2"
 source "$CONDA_BASE/etc/profile.d/conda.sh"
 conda activate  "$CONDA_ENV"
 
@@ -11,10 +11,9 @@ conda activate  "$CONDA_ENV"
 set -euo pipefail
 
 
-DATA_DIR="data"
-OUT_DIR="output/benchmark_expert"
+# OUT_DIR="output_expert"
 
-MODEL='gravity-doubly'
+MODEL='gravity'
 NB_REPEATS=5
 NB_NET_REPEATS=10
 
@@ -22,6 +21,7 @@ NB_NET_REPEATS=10
 # N=20
 # M=20
 
-python -u experiments_expert.py $MODEL $NB_REPEATS $NB_NET_REPEATS; echo
-python -u experiments_expert.py $MODEL $NB_REPEATS $NB_NET_REPEATS -B; echo 
+python -u experiments_expert.py "$MODEL-production" $NB_REPEATS $NB_NET_REPEATS --directed &> expert_grav_prod.log & 
+python -u experiments_expert.py "$MODEL-attraction" $NB_REPEATS $NB_NET_REPEATS --directed &> expert_grav_attrac.log & 
+python -u experiments_expert.py "$MODEL-doubly" $NB_REPEATS $NB_NET_REPEATS --directed &> expert_grav_doubly.log & 
 

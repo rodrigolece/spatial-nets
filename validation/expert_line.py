@@ -14,6 +14,7 @@ def main(output_dir):
     parser.add_argument('nb_repeats', type=int)
     parser.add_argument('nb_net_repeats', type=int)
     parser.add_argument('-m', type=int, default=20)
+    parser.add_argument('--gamma', type=float, default=2.0)
     parser.add_argument('--directed', action='store_true')
     parser.add_argument('-s', '--globalseed', type=int, default=0)
     parser.add_argument('--nosave', action='store_true')  # for testing
@@ -25,6 +26,7 @@ def main(output_dir):
     nb_repeats = args.nb_repeats
     nb_net_repeats = args.nb_net_repeats
     m = args.m
+    gamma = args.gamma
     directed = args.directed
     N = 100  # nb_of nodes
     rho = 100
@@ -51,6 +53,7 @@ def main(output_dir):
     for j in tqdm(range(m)):
         res, res_fix = grav_experiment(
             N, rho, lamb[j], model,
+            gamma=gamma,
             nb_repeats=nb_repeats,
             nb_net_repeats=nb_net_repeats,
             start_seed=args.globalseed,
@@ -105,11 +108,13 @@ def main(output_dir):
 
     if not args.nosave:
         dir_name = 'directed_' if directed else ''
-        filename = f'{dir_name}lamb_{model}_{nb_repeats}_{nb_net_repeats}.npz'
+        gamma_name = f'{gamma:.1f}_' if gamma != 2.0 else ''
+
+        filename = f'{dir_name}{gamma_name}lamb_{model}_{nb_repeats}_{nb_net_repeats}.npz'
         print(f'\nWriting results to {filename}')
         np.savez(output_dir / filename, **save_dict)
 
-        filename = f'{dir_name}lamb_fixB_{model}_{nb_repeats}_{nb_net_repeats}.npz'
+        filename = f'{dir_name}{gamma_name}lamb_fixB_{model}_{nb_repeats}_{nb_net_repeats}.npz'
         print(f'Writing results with fixed B to {filename}')
         np.savez(output_dir / filename, **save_dict_fix)
 
