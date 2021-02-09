@@ -4,30 +4,39 @@ import numpy as np
 import graph_tool.all as gt
 from tqdm import tqdm
 
+from typing import Tuple
+
 from spatial_nets.locations import DataLocations
 from spatial_nets import utils
 
 
-def grav_experiment(
-        N, rho, lamb,
-        model,
-        gamma=2.0,
-        pvalue_constraint='production',
-        nb_repeats=10,
-        nb_net_repeats=2,
-        significance=0.01,
-        start_seed=0,
-        directed=False,
-        verbose=False
+def experiment(
+        N: int,
+        rho: float,
+        params: Tuple,
+        model: str,
+        benchmark: str ='expert',
+        nb_repeats: int = 1,
+        nb_net_repeats: int = 1,
+        significance: float = 0.01,
+        start_seed: int = 0,
+        directed: bool = False,
+        verbose: bool = False,
+        **kwargs
     ):
+
+    assert benchmark in ('expert', 'cerina'), f'invalid benchmark: {benchmark}'
 
     out = np.zeros((nb_repeats * nb_net_repeats, 5))  # overlap, nmi, vi, b, entropy
     out_fix = np.zeros_like(out)
 
+    fun = getattr(utils, f'benchmark_{benchmark}')
+    if verbose:
+        print(fun)
+
     for k in range(nb_net_repeats):
-        coords, comm_vec, coo_mat = utils.benchmark_expert(
-            N, rho, lamb,
-            gamma=gamma,
+        coords, comm_vec, coo_mat = fun(
+            N, rho, *params,
             seed=start_seed + k,
             directed=directed
         )
@@ -134,9 +143,11 @@ def main(output_dir):
 
     for i in tqdm(range(n)):
         for j in range(m):
-            res, res_fix = grav_experiment(
-                N, rho[i,j], lamb[i,j], model,
-                gamma=gamma,
+            params = (lamb[i,j], gamma)
+
+            res, res_fix = experiment(
+                N, rho[i,j], params, model,
+                benchmark='expert',
                 nb_repeats=nb_repeats,
                 nb_net_repeats=nb_net_repeats,
                 start_seed=args.globalseed,

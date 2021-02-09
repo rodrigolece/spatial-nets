@@ -303,7 +303,7 @@ def benchmark_expert(
         nb_nodes,
         edge_density,
         lamb,
-        gamma=2,
+        gamma,
         L=100.0,
         directed=False,
         seed=0
