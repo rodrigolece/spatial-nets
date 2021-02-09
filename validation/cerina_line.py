@@ -33,7 +33,7 @@ def main(output_dir):
     N = 100  # nb_of nodes
     rho = 100
 
-    beta = np.logspace(-1, 2, m)
+    beta = np.logspace(-1, 1, m)
 
     # The save directories
     save_dict = { 'beta': beta }
