@@ -11,17 +11,20 @@ conda activate  "$CONDA_ENV"
 set -euo pipefail
 
 
-# OUT_DIR="output_expert"
-
-MODEL='gravity'
-NB_REPEATS=5
+# MODEL='gravity'
+MODEL='radiation'
+NB_REPEATS=10
 NB_NET_REPEATS=10
 
 # Used as default instead
 # N=20
 # M=20
 
-python -u experiments_expert.py "$MODEL-production" $NB_REPEATS $NB_NET_REPEATS --directed &> expert_grav_prod.log & 
-python -u experiments_expert.py "$MODEL-attraction" $NB_REPEATS $NB_NET_REPEATS --directed &> expert_grav_attrac.log & 
-python -u experiments_expert.py "$MODEL-doubly" $NB_REPEATS $NB_NET_REPEATS --directed &> expert_grav_doubly.log & 
+
+for CT in {production,attraction,doubly}; do
+    # python -u expert_line.py "$MODEL-$CT" $NB_REPEATS $NB_NET_REPEATS --gamma 1.0 --directed &> "$MODEL-$CT.log" & 
+    # python -u expert_line.py "$MODEL-$CT" $NB_REPEATS $NB_NET_REPEATS --directed &> "$MODEL-$CT.log" & 
+    # python -u cerina_line.py "$MODEL-$CT" $NB_REPEATS $NB_NET_REPEATS --epsilon 0.5 --directed &> "cerina-$MODEL-$CT.log" & 
+    python -u cerina_line.py "$MODEL-$CT" $NB_REPEATS $NB_NET_REPEATS --directed &> "cerina-$MODEL-$CT.log" & 
+done
 
