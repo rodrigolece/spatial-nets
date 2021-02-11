@@ -14,7 +14,8 @@ def main(output_dir):
     parser.add_argument('nb_repeats', type=int)
     parser.add_argument('nb_net_repeats', type=int)
     parser.add_argument('-m', type=int, default=20)
-    parser.add_argument('--gamma', type=float, default=2.0)
+    parser.add_argument('--ell', type=float, default=1.0)
+    parser.add_argument('--epsilon', type=float, default=0.0)
     parser.add_argument('--directed', action='store_true')
     parser.add_argument('-s', '--globalseed', type=int, default=0)
     parser.add_argument('--nosave', action='store_true')  # for testing
@@ -26,36 +27,32 @@ def main(output_dir):
     nb_repeats = args.nb_repeats
     nb_net_repeats = args.nb_net_repeats
     m = args.m
-    gamma = args.gamma
+    ell = args.ell
+    epsilon = args.epsilon
     directed = args.directed
     N = 100  # nb_of nodes
     rho = 100
 
-    lamb = np.linspace(0, 1.0, m)
+    beta = np.logspace(-1, 1, m)
 
-    # The save directories, before we modify lamb if the network is directed
-    save_dict = { 'lamb': lamb }
-    save_dict_fix = { 'lamb': lamb }
+    # The save directories
+    save_dict = { 'beta': beta }
+    save_dict_fix = { 'beta': beta }
 
-    mn = [np.zeros_like(lamb) for _ in range(4)]  # overlap, vi, nmi, Bs
-    std = [np.zeros_like(lamb) for _ in range(4)]
-    best = [np.zeros_like(lamb) for _ in range(4)]
+    mn = [np.zeros_like(beta) for _ in range(4)]  # overlap, vi, nmi, Bs
+    std = [np.zeros_like(beta) for _ in range(4)]
+    best = [np.zeros_like(beta) for _ in range(4)]
 
-    mn_fix = [np.zeros_like(lamb) for _ in range(4)]  # overlap, vi, nmi, Bs
-    std_fix = [np.zeros_like(lamb) for _ in range(4)]
-    best_fix = [np.zeros_like(lamb) for _ in range(4)]
-
-    if directed:
-        lamb_12 = np.minimum(lamb + 0.1, 1.0)
-        lamb_21 = np.maximum(lamb - 0.1, 0.0)
-        lamb = np.stack((lamb_12, lamb_21), axis=1)
+    mn_fix = [np.zeros_like(beta) for _ in range(4)]  # overlap, vi, nmi, Bs
+    std_fix = [np.zeros_like(beta) for _ in range(4)]
+    best_fix = [np.zeros_like(beta) for _ in range(4)]
 
     for j in tqdm(range(m)):
-        params = (lamb[j], gamma)
+        params = (ell, beta[j], epsilon)
 
         res, res_fix = experiment(
             N, rho, params, model,
-            benchmark='expert',
+            benchmark='cerina',
             nb_repeats=nb_repeats,
             nb_net_repeats=nb_net_repeats,
             start_seed=args.globalseed,
@@ -109,20 +106,20 @@ def main(output_dir):
 
     if not args.nosave:
         dir_name = 'directed_' if directed else ''
-        gamma_name = f'{gamma:.1f}_' if gamma != 2.0 else ''
+        params_name = f'{ell:.1f}-{epsilon:.1f}_'
 
-        filename = f'{dir_name}{gamma_name}lamb_{model}_{nb_repeats}_{nb_net_repeats}.npz'
+        filename = f'{dir_name}{params_name}beta_{model}_{nb_repeats}_{nb_net_repeats}.npz'
         print(f'\nWriting results to {filename}')
         np.savez(output_dir / filename, **save_dict)
 
-        filename = f'{dir_name}{gamma_name}lamb_fixB_{model}_{nb_repeats}_{nb_net_repeats}.npz'
+        filename = f'{dir_name}{params_name}beta_fixB_{model}_{nb_repeats}_{nb_net_repeats}.npz'
         print(f'Writing results with fixed B to {filename}')
         np.savez(output_dir / filename, **save_dict_fix)
 
     print('\nDone!\n')
 
 
-if __name__ == '__main__':
-    output_dir = Path('output_expert')
-    main(output_dir)
 
+if __name__ == '__main__':
+    output_dir = Path('output_cerina')
+    main(output_dir)

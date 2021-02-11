@@ -1,11 +1,13 @@
 import os
 from pathlib import Path
+import collections
 import warnings
 import numpy as np
 import pandas as pd
 import scipy.sparse as sp
 from scipy.io import loadmat
 from typing import List, Union
+from collections.abc import Iterable
 
 import graph_tool as gt
 
@@ -19,11 +21,20 @@ from sklearn.metrics import pairwise
 #]
 
 
+def _get_iterable(x):
+    """Utility function."""
+    if isinstance(x, collections.Iterable) and not isinstance(x, str):
+        return x
+    else:
+        return (x,)
+
+
 def build_graph(mat, idx=None, directed=True, coords=None, vertex_properties={}):
     """Build a Graph from a given mat and a subset of the nonzero entries."""
     nb_nodes, _ = mat.shape
 
     i, j = mat.nonzero()
+    # TODO: could reuse i,j and avoid the else clause
     if idx is not None:
         ii, jj = i[idx], j[idx]
     else:
@@ -65,8 +76,8 @@ def build_graph(mat, idx=None, directed=True, coords=None, vertex_properties={})
 
 
 def build_significant_graph(locs,
-                            coords,
-                            model='gravity-doubly',
+                            model,
+                            coords=None,
                             significance=0.01,
                             verbose=False):
 
@@ -75,17 +86,21 @@ def build_significant_graph(locs,
     pvalue_ct = 'production' if ct == 'doubly' else ct
     # we default to production for the pvalues for the DC model
 
-    if family == 'gravity' and ct == 'production':
-        c, *other, b = locs.gravity_calibrate_nonlinear(constraint_type=ct)
-        fmat = locs.gravity_matrix(c, α=0, β=b)
+    if family == 'gravity':
+        if ct == 'production':
+            c, *other, b = locs.gravity_calibrate_nonlinear(constraint_type=ct)
+            fmat = locs.gravity_matrix(c, α=0, β=b)
 
-    elif family == 'gravity' and ct == 'attraction':
-        c, a, *other = locs.gravity_calibrate_nonlinear(constraint_type=ct)
-        fmat = locs.gravity_matrix(c, α=a, β=0)
+        elif ct == 'attraction':
+            c, a, *other = locs.gravity_calibrate_nonlinear(constraint_type=ct)
+            fmat = locs.gravity_matrix(c, α=a, β=0)
 
-    elif family == 'gravity' and ct == 'doubly':
-        c, *other = locs.gravity_calibrate_nonlinear(constraint_type=ct)
-        fmat = locs.gravity_matrix(c, α=0, β=0)
+        elif ct == 'doubly':
+            c, *other = locs.gravity_calibrate_nonlinear(constraint_type=ct)
+            fmat = locs.gravity_matrix(c, α=0, β=0)
+
+    elif family == 'radiation':
+        fmat = locs.radiation_matrix(finite_correction=False)
 
     else:
         raise NotImplementedError
@@ -217,15 +232,27 @@ def sparsemat_remove_diag(spmat):
 #     return df
 
 
-def benchmark_cerina(nb_nodes, edge_density, l, beta, epsilon, L=1.0, seed=0):
+def benchmark_cerina(
+        nb_nodes,
+        edge_density,
+        ell,
+        beta,
+        epsilon,
+        L=1.0,
+        directed=False,
+        seed=0
+    ):
     """Create a benchmark network of the type proposed by Cerina et al."""
     N = nb_nodes
-    nb_edges = N * (N - 1) * edge_density // 2
+
+    nb_edges = int(N * (N - 1) * edge_density)
+    if not directed:
+        nb_edges //= 2
 
     rng = np.random.RandomState(seed)
 
     # Coordinates
-    ds = rng.exponential(scale=l, size=N)
+    ds = rng.exponential(scale=ell, size=N)
     alphas = 2 * np.pi * rng.rand(N)
     shift = L * np.ones(N)
     shift[N // 2:] *= -1
@@ -238,18 +265,24 @@ def benchmark_cerina(nb_nodes, edge_density, l, beta, epsilon, L=1.0, seed=0):
     idx_plane = xs > 0
     idx_success = rng.rand(N) < 1 - epsilon
 
-    comm_vec = np.zeros((N, 1), dtype=int)  # column vector
+    n = N // 2
+    comm_vec = np.zeros(N, dtype=int)
     comm_vec[np.bitwise_and(idx_plane, idx_success)] = 1
     comm_vec[np.bitwise_and(idx_plane, ~idx_success)] = -1
     comm_vec[np.bitwise_and(~idx_plane, idx_success)] = -1
     comm_vec[np.bitwise_and(~idx_plane, ~idx_success)] = 1
 
     # Edge selection
-    smat = comm_vec.T * comm_vec
+    smat = comm_vec * comm_vec[:, np.newaxis]
     dmat = pairwise.euclidean_distances(coords)
-    pmat = np.exp(beta * smat - dmat / l)
+    pmat = np.exp(beta * smat - dmat / ell)
 
-    i, j = np.triu_indices_from(pmat, k=1)  # keep i < j
+    i, j = np.triu_indices_from(pmat, k=1)  # i < j
+    if directed:
+        r, s = np.tril_indices_from(smat, k=-1)  # i > j
+        i = np.concatenate((i, r))
+        j = np.concatenate((j, s))
+
     probas = pmat[i, j]
     probas /= probas.sum()  # normalization
 
@@ -257,16 +290,37 @@ def benchmark_cerina(nb_nodes, edge_density, l, beta, epsilon, L=1.0, seed=0):
     idx, = draw.nonzero()
     mat = sp.coo_matrix((draw[idx], (i[idx], j[idx])), shape=(N, N))
 
+    if not directed:
+        mat = (mat + mat.T).tocoo()  # addition changes to csr
+
     # more useful values in atrribute vector
-    comm_vec[N // 2:] = 0
+    comm_vec[comm_vec == -1] = 0
 
-    return coords, np.squeeze(comm_vec), mat
+    return coords, comm_vec, mat
 
 
-def benchmark_expert(nb_nodes, edge_density, lamb, gamma=2, L=100.0, seed=0):
+def benchmark_expert(
+        nb_nodes,
+        edge_density,
+        lamb,
+        gamma,
+        L=100.0,
+        directed=False,
+        seed=0
+    ):
     """Create a benchmark network of the type proposed by Expert et al."""
+    lamb = _get_iterable(lamb)
+    if directed:
+        assert len(lamb) == 2
+    else:
+        assert len(lamb) == 1, \
+                'lamb should be scalar for undirected network'
+
     N = nb_nodes
-    nb_edges = N * (N - 1) * edge_density // 2
+
+    nb_edges = int(N * (N - 1) * edge_density )
+    if not directed:
+        nb_edges //= 2
 
     rng = np.random.RandomState(seed)
 
@@ -275,16 +329,27 @@ def benchmark_expert(nb_nodes, edge_density, lamb, gamma=2, L=100.0, seed=0):
 
     # Attibute assignment
     comm_vec = np.ones(N, dtype=int)
-    comm_vec[N // 2:] = -1  # helpful for checking same/diff comm
+    n = N // 2
+    comm_vec[n:] = -1  # helpful for checking same/diff comm
 
     # Edge selection
     smat = (comm_vec * comm_vec[:, np.newaxis]).astype(float)
     # smat[smat == 1] = 1
-    smat[smat == -1] = lamb
+
+    if directed:
+        smat[:n, n:] = lamb[0]
+        smat[n:, :n] = lamb[1]
+    else:
+        smat[smat == -1] = lamb[0]
 
     dmat = pairwise.euclidean_distances(coords)
 
-    i, j = np.triu_indices_from(smat, k=1)  # keep i < j
+    i, j = np.triu_indices_from(smat, k=1)  # i < j
+    if directed:
+        k, l = np.tril_indices_from(smat, k=-1)  # i > j
+        i = np.concatenate((i, k))
+        j = np.concatenate((j, l))
+
     probas = smat[i, j] / (dmat[i, j]**gamma)
     probas /= probas.sum()  # normalization
 
@@ -292,10 +357,13 @@ def benchmark_expert(nb_nodes, edge_density, lamb, gamma=2, L=100.0, seed=0):
     idx, = draw.nonzero()
     mat = sp.coo_matrix((draw[idx], (i[idx], j[idx])), shape=(N, N))
 
+    if not directed:
+        mat = (mat + mat.T).tocoo()  # addition changes to csr
+
     # more useful values in atrribute vector
     comm_vec[N // 2:] = 0
 
-    return coords, np.squeeze(comm_vec), mat
+    return coords, comm_vec, mat
 
 
 def greatcircle_distance(long1, lat1, long2, lat2, R=6371):
