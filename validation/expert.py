@@ -15,7 +15,7 @@ def experiment(
         rho: float,
         params: Tuple,
         model: str,
-        benchmark: str ='expert',
+        benchmark: str = 'expert',
         nb_repeats: int = 1,
         nb_net_repeats: int = 1,
         significance: float = 0.01,
@@ -27,7 +27,7 @@ def experiment(
 
     assert benchmark in ('expert', 'cerina'), f'invalid benchmark: {benchmark}'
 
-    out = np.zeros((nb_repeats * nb_net_repeats, 5))  # overlap, nmi, vi, b, entropy
+    out = np.zeros((nb_repeats * nb_net_repeats, 5))  # overlap, nmi, vi, B, entropy
     out_fix = np.zeros_like(out)
 
     fun = getattr(utils, f'benchmark_{benchmark}')
@@ -143,7 +143,7 @@ def main(output_dir):
 
     for i in tqdm(range(n)):
         for j in range(m):
-            params = (lamb[i,j], gamma)
+            params = (lamb[i, j], gamma)
 
             res, res_fix = experiment(
                 N, rho[i,j], params, model,
@@ -211,10 +211,10 @@ def main(output_dir):
         print(f'Writing results with fixed B to {filename}')
         np.savez(output_dir / filename, **save_dict_fix)
 
-    print('\nDone!\n')
-
 
 if __name__ == '__main__':
     output_dir = Path('output_expert')
     main(output_dir)
+
+    print('\nDone!\n')
 

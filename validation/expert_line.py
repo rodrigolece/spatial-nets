@@ -119,10 +119,10 @@ def main(output_dir):
         print(f'Writing results with fixed B to {filename}')
         np.savez(output_dir / filename, **save_dict_fix)
 
-    print('\nDone!\n')
-
 
 if __name__ == '__main__':
     output_dir = Path('output_expert')
     main(output_dir)
+
+    print('\nDone!\n')
 

@@ -273,7 +273,7 @@ def benchmark_cerina(
     comm_vec[np.bitwise_and(~idx_plane, ~idx_success)] = 1
 
     # Edge selection
-    smat = comm_vec * comm_vec[:, np.newaxis]
+    smat = comm_vec[:, np.newaxis] * comm_vec
     dmat = pairwise.euclidean_distances(coords)
     pmat = np.exp(beta * smat - dmat / ell)
 
@@ -333,7 +333,7 @@ def benchmark_expert(
     comm_vec[n:] = -1  # helpful for checking same/diff comm
 
     # Edge selection
-    smat = (comm_vec * comm_vec[:, np.newaxis]).astype(float)
+    smat = (comm_vec[:, np.newaxis] * comm_vec).astype(float)
     # smat[smat == 1] = 1
 
     if directed:
