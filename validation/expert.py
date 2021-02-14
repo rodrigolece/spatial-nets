@@ -59,6 +59,7 @@ def experiment(
         graph = utils.build_significant_graph(
             locs,
             model,
+            sign='plus',
             coords=coords,
             significance=significance,
             verbose=verbose
