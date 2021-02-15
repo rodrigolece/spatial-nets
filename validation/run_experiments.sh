@@ -22,9 +22,9 @@ NB_NET_REPEATS=10
 
 
 for CT in {production,attraction,doubly}; do
-    # python -u expert_line.py "$MODEL-$CT" $NB_REPEATS $NB_NET_REPEATS --gamma 1.0 --directed &> "$MODEL-$CT.log" & 
-    # python -u expert_line.py "$MODEL-$CT" $NB_REPEATS $NB_NET_REPEATS --directed &> "$MODEL-$CT.log" & 
-    # python -u cerina_line.py "$MODEL-$CT" $NB_REPEATS $NB_NET_REPEATS --epsilon 0.5 --directed &> "cerina-$MODEL-$CT.log" & 
-    python -u cerina_line.py "$MODEL-$CT" $NB_REPEATS $NB_NET_REPEATS --directed &> "cerina-$MODEL-$CT.log" & 
+    # python -u expert_line.py "$MODEL-$CT" $NB_REPEATS $NB_NET_REPEATS &> "$MODEL-$CT.log" & 
+    # python -u expert_line.py "$MODEL-$CT" $NB_REPEATS $NB_NET_REPEATS --gamma 1.0 &> "$MODEL-$CT.log" & 
+    python -u cerina_line.py "$MODEL-$CT" $NB_REPEATS $NB_NET_REPEATS &> "cerina-$MODEL-$CT.log" & 
+    # python -u cerina_line.py "$MODEL-$CT" $NB_REPEATS $NB_NET_REPEATS --epsilon 0.5 &> "cerina-$MODEL-$CT.log" & 
 done
 
