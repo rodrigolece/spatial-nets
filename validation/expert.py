@@ -14,6 +14,7 @@ def main(output_dir):
     parser.add_argument('-n', type=int, default=20)
     parser.add_argument('-m', type=int, default=20)
     parser.add_argument('--gamma', type=float, default=2.0)
+    parser.add_argument('--sign', default='plus')
     parser.add_argument('-s', '--globalseed', type=int, default=0)
     parser.add_argument('--nosave', action='store_true')  # for testing
     parser.add_argument('-v', '--verbose', action='store_true')
@@ -25,11 +26,12 @@ def main(output_dir):
     nb_net_repeats = args.nb_net_repeats
     n, m = args.n, args.m
     gamma = args.gamma
+    sign = args.sign
     directed = True
     N = 100  # nb of nodes
 
     r = np.logspace(0, 2, n)
-    l = np.linspace(0.0, 1.0, m)
+    l = np.linspace(0.0, 2.0, m)
     rho, lamb = np.meshgrid(r, l)
 
     # The save directories, before we modify lamb to make the network directed
@@ -44,7 +46,7 @@ def main(output_dir):
     std_fix = [np.zeros_like(rho) for _ in range(4)]
     best_fix = [np.zeros_like(rho) for _ in range(4)]
 
-    lamb_12 = np.minimum(lamb + 0.1, 1.0)
+    lamb_12 = np.minimum(lamb + 0.1, 2.0)
     lamb_21 = np.maximum(lamb - 0.1, 0.0)
     lamb = np.stack((lamb_12, lamb_21), axis=2)
 
@@ -55,6 +57,7 @@ def main(output_dir):
             exp = Experiment(
                 N, rho[i,j], params, model,
                 benchmark='expert',
+                sign=sign,
                 directed=directed,
                 verbose=args.verbose
             )
@@ -112,11 +115,11 @@ def main(output_dir):
     if not args.nosave:
         gamma_name = f'{gamma:.1f}_' if gamma != 2.0 else ''
 
-        filename = f'{gamma_name}rho-lamb_{model}_{nb_repeats}_{nb_net_repeats}.npz'
+        filename = f'{sign}_{gamma_name}rho-lamb_{model}_{nb_repeats}_{nb_net_repeats}.npz'
         print(f'\nWriting results to {filename}')
         np.savez(output_dir / filename, **save_dict)
 
-        filename = f'{gamma_name}rho-lamb_fixB_{model}_{nb_repeats}_{nb_net_repeats}.npz'
+        filename = f'{sign}_{gamma_name}rho-lamb_fixB_{model}_{nb_repeats}_{nb_net_repeats}.npz'
         print(f'Writing results with fixed B to {filename}')
         np.savez(output_dir / filename, **save_dict_fix)
 
