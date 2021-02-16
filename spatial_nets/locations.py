@@ -937,7 +937,7 @@ def CPL(F1: Array, F2: Array, rel_tol: float = 1e-3) -> float:
     return 2 * np.sum(prod) / (np.sum(bool_F1) + np.sum(bool_F2))
 
 
-def RMSE(F1: Array, F2: Array, rel_tol: float = 1e-3) -> float:
+def RMSE(F1: Array, F2: Array, rel_tol: float = 1e-3, norm=True) -> float:
     """
     Calculate root-mean-square error between two models.
 
@@ -958,8 +958,12 @@ def RMSE(F1: Array, F2: Array, rel_tol: float = 1e-3) -> float:
 
     diff = F1 - F2
     power = diff.power(2) if sparse.issparse(diff) else np.power(diff, 2)
+    out = np.sqrt(power.sum() / N)
 
-    return np.sqrt(power.sum() / N)
+    if norm:
+        out /= F1.max() - F1.min()
+
+    return out
 
 
 # def _iterative_proportional_fit(f_mat: Array,

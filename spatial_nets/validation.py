@@ -39,6 +39,7 @@ class Experiment(object):
         if self.verbose:
             print(self.benchmark)
             print(self.model)
+            print(self.sign)
 
         return None
 
