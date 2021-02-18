@@ -1,6 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import colors
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+from spatial_nets import utils
 
 
 # default_cm = gt.default_cm  # 'Set3'
@@ -92,3 +95,21 @@ def signed_scatterplot(locs,
     ax.set_ylabel('Predicted flow', fontsize=fs)
 
     return None
+
+
+def contourf(x, y, z, ax, fig, labels=None, colorbar=True, norm=None):
+    im = ax.contourf(x, y, z, norm=norm)
+
+    labels = utils._get_iterable(labels)
+    if len(labels) > 1:
+        ax.set_xlabel(labels[0])
+        ax.set_ylabel(labels[1])
+
+    if colorbar:
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes('right', size='5%', pad=0.3)
+        fig.colorbar(im, cax=cax)
+        if len(labels) == 3:
+            cax.set_ylabel(labels[2], labelpad=10)
+
+    return fig, ax
