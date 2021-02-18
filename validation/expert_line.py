@@ -44,7 +44,7 @@ def main(output_dir):
     std_fix = [np.zeros_like(lamb) for _ in range(4)]
     best_fix = [np.zeros_like(lamb) for _ in range(4)]
 
-    lamb_12 = np.minimum(lamb + 0.1, 2.0)
+    lamb_12 = lamb + 0.1
     lamb_21 = np.maximum(lamb - 0.1, 0.0)
     lamb = np.stack((lamb_12, lamb_21), axis=1)
 

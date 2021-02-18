@@ -32,7 +32,7 @@ def main(output_dir):
 
     r = np.logspace(0, 2, n)
     l = np.linspace(0.0, 2.0, m)
-    rho, lamb = np.meshgrid(r, l)
+    rho, lamb = np.meshgrid(r, l, indexing='ij')
 
     # The save directories, before we modify lamb to make the network directed
     save_dict = { 'rho': rho, 'lamb': lamb }
@@ -46,7 +46,7 @@ def main(output_dir):
     std_fix = [np.zeros_like(rho) for _ in range(4)]
     best_fix = [np.zeros_like(rho) for _ in range(4)]
 
-    lamb_12 = np.minimum(lamb + 0.1, 2.0)
+    lamb_12 = lamb + 0.1
     lamb_21 = np.maximum(lamb - 0.1, 0.0)
     lamb = np.stack((lamb_12, lamb_21), axis=2)
 
