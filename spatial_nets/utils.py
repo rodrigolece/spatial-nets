@@ -376,10 +376,10 @@ def greatcircle_distance(long1, lat1, long2, lat2, R=6371):
 
     Parameters
     ----------
-    long, lat : float
-        The longitude and latitude of the starting point.
-    end_long, end_lat : float
-        The longitude and latitude of the end point.
+    long1, lat1 : float
+        The longitude and latitude of the first point.
+    long2, lat2 : float
+        The longitude and latitude of the second point.
     R : float, optional
         The radius of the Earth in km (default value is 6371).
 
