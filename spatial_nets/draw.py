@@ -84,17 +84,32 @@ def setup_default_colormaps(register=True):
     return out
 
 
-def gt_color_legend(state, legendsize=(6, 0.35), cmap=default_cm):
-    """Axis with discrete colors corresponding to GraphTool.BlockState object."""
-    nb_colors = state.get_B()
-    gradient = np.linspace(0, 1, nb_colors)
-    gradient = np.vstack((gradient, gradient))
+def gt_color_legend(
+        state,
+        comms=None,
+        ax=None,
+        norm=None,
+        cmap=default_cm,
+        legendsize=(6, 0.35)
+    ):
+    """Axis with discrete colors corresponding to BlockState object."""
+    if comms is not None:
+        comms = np.unique(comms)
+        B = len(comms)
+    else:
+        B = state.get_nonempty_B()  # previously I used: state.get_B()
 
-    fig, ax = plt.subplots(figsize=legendsize, squeeze=True)
-    ax.imshow(gradient, aspect='auto', cmap=cmap)
-    ax.get_xaxis().set_ticks(range(nb_colors))
+    data = np.arange(B).reshape(1, B)
+
+    if ax is None:
+        _, ax = plt.subplots(figsize=legendsize, squeeze=True)
+
+    ax.imshow(data, aspect='auto', cmap=cmap, norm=norm)
     ax.get_yaxis().set_visible(False)
-    # ax.set_axis_off()
+    ax.get_xaxis().set_ticks(range(B))
+
+    if comms is not None:
+        ax.get_xaxis().set_ticklabels(comms)
 
     return None
 
@@ -170,3 +185,73 @@ def contourf(x, y, z, ax, fig, labels=None, colorbar=True, norm=None):
             cax.set_ylabel(labels[2], labelpad=10)
 
     return fig, ax
+
+
+def selected_comms(
+        state,
+        comms,
+        coords,
+        ax=None,
+        background=False,
+        cmap=default_cm,
+        ms=1,
+        hms=10,
+        legend=False
+    ):
+    comms = np.unique(comms)
+
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(6, 8))
+        out = fig, ax
+    else:
+        out = None
+
+    if background:
+        ax.scatter(coords[:, 0], coords[:, 1], s=ms, c='k')
+
+    bounds = np.linspace(0, len(comms), len(comms) + 1)
+    norm = colors.BoundaryNorm(bounds, cmap.N)
+
+    for i, c in enumerate(comms):
+        idx = state.b.a == c
+        color_vec = np.ones(idx.sum(), dtype=int)*i
+        ax.scatter(
+            coords[idx, 0],
+            coords[idx, 1],
+            s=hms,
+            c=color_vec,
+            cmap=cmap,
+            norm=norm)
+
+    ax.axis('equal')
+    ax.set_xticks([])
+    ax.set_yticks([])
+
+    if legend:
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes('bottom', size='5%', pad=0.1)
+        gt_color_legend(state, comms=comms, ax=cax, norm=norm)
+
+    return out
+
+
+def comm_sizes(*states, labels=None, ax=None, width=0.8, alpha=0.4):
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(10, 4))
+        out = fig, ax
+    else:
+        out = None
+
+    for state in states:
+        u, cs = np.unique(state.b.a, return_counts=True)
+        idx = np.argsort(cs)[::-1]
+        ax.bar(u, cs[idx], align='edge', width=width, alpha=alpha)
+
+    ax.set_label('Community')
+    ax.set_ylabel('Nb of nodes')
+
+    if labels:
+        ax.legend(labels)
+
+    return out
+
