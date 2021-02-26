@@ -38,8 +38,8 @@ def mean_composition(
         u, cs = np.unique(format_vec[idx], return_counts=True)
         out[c, u] = cs
 
-        if norm:
-            out = out / out.sum(axis=1)[:, np.newaxis]
+    if norm:
+        out = out / out.sum(axis=1)[:, np.newaxis]
 
     return out
 
