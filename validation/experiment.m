@@ -14,13 +14,20 @@ for k = 1:nb_net_repeats
         row = (k-1)*nb_repeats + i;
         
         [spa, ~, ~] = ModularitySpaGN(T_data, dmat, O_vec, binsize);
-        [Y, Q] = spectral23(T_data, spa);
-        [Q_max, r] = max(Q);
-        y = Y(r,:)';
+        try
+            [Y, Q] = spectral23(T_data, spa);
+            [Q_max, r] = max(Q);
+            Q_max = Q_max/twom;
+            y = Y(r,:)';  % column vector
+        catch exception
+            disp(exception.identifier)
+            y = zeros(N, 1);
+            Q_max = -1;
+        end
         
         n = nmi(comm_vec, y);
         B = numel(unique(y));
-        res(row, :) = [n, B, Q_max/twom];
+        res(row, :) = [n, B, Q_max];
         
     end
 end
