@@ -20,8 +20,8 @@ default_cm = colors.LinearSegmentedColormap.from_list(
 )
 
 default_names = [
-    'acqua', 'melrose', 'salmon', 'shakespeare', 'rajah', 'sulu',
-     'classic_rose', 'gainsboro', 'plum', 'snowy_mint', 'witch_haze'
+    'aqua', 'melrose', 'salmon', 'shakespeare', 'rajah', 'sulu',
+    'classic_rose', 'gainsboro', 'plum', 'snowy_mint', 'witch_haze'
 ]
 
 
@@ -209,8 +209,11 @@ def selected_comms(
     if background:
         ax.scatter(coords[:, 0], coords[:, 1], s=ms, c='k')
 
-    bounds = np.linspace(0, len(comms), len(comms) + 1)
-    norm = colors.BoundaryNorm(bounds, cmap.N)
+    if len(comms) > 1:
+        bounds = np.linspace(0, len(comms), len(comms) + 1)
+        norm = colors.BoundaryNorm(bounds, cmap.N)
+    else:
+        norm = None
 
     for i, c in enumerate(comms):
         idx = state.b.a == c
@@ -245,7 +248,7 @@ def comm_sizes(*states, labels=None, ax=None, width=0.8, alpha=0.4):
     for state in states:
         u, cs = np.unique(state.b.a, return_counts=True)
         idx = np.argsort(cs)[::-1]
-        ax.bar(u, cs[idx], align='edge', width=width, alpha=alpha)
+        ax.bar(u, cs[idx], align='center', width=width, alpha=alpha)
 
     ax.set_label('Community')
     ax.set_ylabel('Nb of nodes')
