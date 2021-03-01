@@ -116,16 +116,29 @@ def gt_color_legend(
 
 def signed_scatterplot(locs,
                        T_model,
-                       idx_plus,
-                       idx_minus,
+                       idx_tuple,
                        ax,
+                       sample=None,
                        colors=['C0', 'C1', '0.75'],
                        alpha=0.2,
                        fs=18,
                        rounded=False,
                        threshold=None):
+    #TODO: colors can be removed, better to use cycler
+
+    idx_tuple = utils._get_iterable(idx_tuple)
+    assert len(idx_tuple) in (2, 3), 'invalid list of indices'
+
+    if len(idx_tuple) == 2:
+        idx_plus, idx_minus = idx_tuple
+        idx_zero = ~np.bitwise_or(idx_plus, idx_minus)
+    else:
+        idx_plus, idx_minus, idx_zero = idx_tuple
 
     i, j = locs.data.nonzero()
+    if sample is not None:
+        i, j = i[sample], j[sample]
+
     observed = np.asarray(locs.data[i, j]).flatten()
     predicted = T_model[i, j]
 
@@ -134,8 +147,6 @@ def signed_scatterplot(locs,
 
     minus_observed = observed[idx_minus]
     minus_predicted = predicted[idx_minus]
-
-    idx_zero = ~np.bitwise_or(idx_plus, idx_minus)
 
     zero_observed = observed[idx_zero]
     zero_predicted = predicted[idx_zero]
