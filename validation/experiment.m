@@ -1,6 +1,6 @@
 function [mn, std] = experiment(N, rho, lamb, gamma, nb_repeats, nb_net_repeats, start_seed, binsize)
 
-disp([num2str(rho), ' - ', num2str(lamb)])
+% disp([num2str(rho), ' - ', num2str(lamb)])
 res = zeros(nb_repeats * nb_net_repeats, 3);
 
 for k = 1:nb_net_repeats
