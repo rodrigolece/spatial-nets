@@ -2,7 +2,7 @@ function [dmat, comm_vec, mat] = benchmark_expert(N, rho, lamb, gamma, seed)
 
 L = 100;
 
-nb_edges = floor(N * (N-1) * rho) / 2;
+nb_edges = floor(N * (N-1) * rho / 2);
 
 rng(seed);
 
