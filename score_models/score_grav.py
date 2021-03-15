@@ -73,9 +73,17 @@ def main(output_dir):
     else:
         kwargs = {}
 
-    locs = Locations.from_data(dmat, T_data)
-    method = getattr(locs, f'gravity_calibrate_{args.fun}')
+    outflow = np.asarray(T_data.sum(axis=1)).flatten().astype(float)
+    outflow[outflow == 0] = 0.1
+    inflow = np.asarray(T_data.sum(axis=0)).flatten().astype(float)
+    inflow[inflow == 0] = 0.1
+    N = len(outflow)
 
+    locs = Locations(N, dmat, outflow, inflow)
+    locs.data = T_data
+    # locs = Locations.from_data(dmat, T_data)
+
+    method = getattr(locs, f'gravity_calibrate_{args.fun}')
 
     # Start the calculations proper
 

@@ -60,7 +60,15 @@ def main(output_dir):
         print(f"\nReading distance matrix from '{os.path.basename(dmat_file)}'")
         dmat = utils.load_dmat(dmat_file)
 
-    locs = Locations.from_data(dmat, T_data)
+    outflow = np.asarray(T_data.sum(axis=1)).flatten().astype(float)
+    outflow[outflow == 0] = 0.1
+    inflow = np.asarray(T_data.sum(axis=0)).flatten().astype(float)
+    inflow[inflow == 0] = 0.1
+    N = len(outflow)
+
+    locs = Locations(N, dmat, outflow, inflow)
+    locs.data = T_data
+    # locs = Locations.from_data(dmat, T_data)
 
 
     # Start the calculations proper
