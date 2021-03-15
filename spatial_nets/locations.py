@@ -959,7 +959,7 @@ def RMSE(F1: Array, F2: Array, rel_tol: float = 1e-3, norm=True) -> float:
     out = np.sqrt(power.sum() / N)
 
     if norm:
-        out /= F1.max() - F1.min()
+        out *= N / x
 
     return out
 

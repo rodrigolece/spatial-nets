@@ -94,7 +94,7 @@ def main(output_dir):
     r2 = [metrics.r2_score(T_data.toarray(), model) for model in models]
     results = np.array([cpc, cpl, rms, r2])
 
-    rows = ['CPC', 'CPL', 'NRMSE', 'R2']
+    rows = ['CPC', 'CPL', 'SRMSE', 'R2']
     cols = ['', 'Rad. Unc.', 'Rad. Prod.', 'Rad. Attr.', 'Rad. Doubly']
     tab = [[rows[i]] + results[i].tolist() for i in range(len(rows))]
 
