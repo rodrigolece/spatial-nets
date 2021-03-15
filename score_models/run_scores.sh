@@ -3,7 +3,7 @@
 
 # Activate conda environment; raises unbound error
 CONDA_BASE="$(conda info --base)"
-CONDA_ENV="gt"
+CONDA_ENV="gt2"
 source "$CONDA_BASE/etc/profile.d/conda.sh"
 conda activate  "$CONDA_ENV"
 
@@ -12,11 +12,10 @@ set -euo pipefail
 
 
 DATA_DIR="../data"
-# OUT_DIR="output"
+FLOW_FILE="$DATA_DIR/US_air_traffic2006.npz"
+DMAT_FILE="$DATA_DIR/US_airports2006_dmat.npz"
+# OUT_DIR="output_usair"  selected inside the python scripts
 
-# python -u score_grav.py -e "$DATA_DIR/UK_commute2011.npz" "$DATA_DIR/UK_geodesic_dmat.mat" -o 'pvalues_grav.npz'
-# python -u score_rad.py -e "$DATA_DIR/UK_commute2011.npz" "$DATA_DIR/UK_geodesic_dmat.mat" -o 'pvalues_rad_geodesic.npz'
+{ time python -u score_grav.py -e $FLOW_FILE $DMAT_FILE -o 'pvalues_grav.npz' --latex  > usair_grav.log & } 2> time_grav.txt
+{ time  python -u score_rad.py -e $FLOW_FILE $DMAT_FILE -o 'pvalues_rad.npz' --latex > usair_rad.log & } 2> time_rad.txt
 
-# python -u score_grav.py -e "$DATA_DIR/UK_commute2011.npz" "$DATA_DIR/UK_here_dmat.npz" -o 'pvalues_grav_here.npz'
-# python -u score_rad.py -e "$DATA_DIR/UK_commute2011.npz" "$DATA_DIR/UK_here_dmat.npz" -o 'pvalues_rad_here.npz'
-python -u score_grav.py "$DATA_DIR/UK_commute2011.npz" "$DATA_DIR/UK_geodesic_dmat.mat"  #--latex

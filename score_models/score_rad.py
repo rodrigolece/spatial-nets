@@ -165,7 +165,7 @@ def main(output_dir):
 
 
 if __name__ == '__main__':
-    output_dir = Path('output')
+    output_dir = Path('output_usair')
     main(output_dir)
 
     print('\nDone!\n')
