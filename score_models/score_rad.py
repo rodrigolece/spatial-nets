@@ -6,7 +6,7 @@ from sklearn import metrics
 from tabulate import tabulate
 from tqdm import tqdm
 
-from spatial_nets.locations import DataLocations, CPC, CPL, RMSE
+from spatial_nets.locations import Locations, CPC, CPL, RMSE
 from spatial_nets import utils
 
 
@@ -60,7 +60,7 @@ def main(output_dir):
         print(f"\nReading distance matrix from '{os.path.basename(dmat_file)}'")
         dmat = utils.load_dmat(dmat_file)
 
-    locs = DataLocations(dmat, T_data)
+    locs = Locations.from_data(dmat, T_data)
 
 
     # Start the calculations proper
