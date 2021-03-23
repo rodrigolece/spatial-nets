@@ -3,7 +3,7 @@ import graph_tool.all as gt
 
 from typing import Dict
 
-from spatial_nets.locations import DataLocations
+from spatial_nets.locations import Locations
 from spatial_nets import utils
 
 
@@ -62,7 +62,7 @@ class Experiment(object):
 
         if return_backbone:
             T_data = coo_mat.tocsr()
-            locs = DataLocations(coords, T_data)
+            locs = Locations.from_data(coords, T_data)
 
             backbone = utils.build_significant_graph(
                 locs,
