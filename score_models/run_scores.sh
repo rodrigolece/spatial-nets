@@ -11,9 +11,12 @@ conda activate  "$CONDA_ENV"
 set -euo pipefail
 
 
-DATA_DIR="data"
-OUT_DIR="output"
+DATA_DIR="../data"
+# OUT_DIR="output"
 
-python -u score_grav.py "$DATA_DIR/UK_commute2011.npz" "$DATA_DIR/UK_here_dmat.npz"; echo
-python -u score_grav.py "$DATA_DIR/UK_commute2011.npz" "$DATA_DIR/UK_geodesic_dmat.mat"
+# python -u score_grav.py -e "$DATA_DIR/UK_commute2011.npz" "$DATA_DIR/UK_geodesic_dmat.mat" -o 'pvalues_grav.npz'
+# python -u score_rad.py -e "$DATA_DIR/UK_commute2011.npz" "$DATA_DIR/UK_geodesic_dmat.mat" -o 'pvalues_rad_geodesic.npz'
 
+# python -u score_grav.py -e "$DATA_DIR/UK_commute2011.npz" "$DATA_DIR/UK_here_dmat.npz" -o 'pvalues_grav_here.npz'
+# python -u score_rad.py -e "$DATA_DIR/UK_commute2011.npz" "$DATA_DIR/UK_here_dmat.npz" -o 'pvalues_rad_here.npz'
+python -u score_grav.py "$DATA_DIR/UK_commute2011.npz" "$DATA_DIR/UK_geodesic_dmat.mat"  #--latex

@@ -77,9 +77,12 @@ def build_graph(mat, idx=None, directed=True, coords=None, vertex_properties={})
 
 def build_significant_graph(locs,
                             model,
+                            sign='plus',
                             coords=None,
                             significance=0.01,
                             verbose=False):
+
+    assert sign in ('plus', 'minus'), 'Invalid sign'
 
     family, ct = model.split('-')
 
@@ -107,10 +110,12 @@ def build_significant_graph(locs,
 
     T_model = locs.constrained_model(fmat, ct, verbose=verbose)
     pmat = locs.probability_matrix(T_model, pvalue_ct)
-    pvals = locs.pvalues_exact(pmat, constraint_type=pvalue_ct)
-    idx_plus = pvals[:, 0] < significance
 
-    out = build_graph(locs.data, idx_plus, coords=coords, directed=True)
+    pvals = locs.pvalues_exact(pmat, constraint_type=pvalue_ct)
+    pvals = pvals[:, 0] if sign == 'plus' else pvals[:, 1]
+    idx = pvals < significance
+
+    out = build_graph(locs.data, idx, coords=coords, directed=True)
 
     return out
 
@@ -371,10 +376,10 @@ def greatcircle_distance(long1, lat1, long2, lat2, R=6371):
 
     Parameters
     ----------
-    long, lat : float
-        The longitude and latitude of the starting point.
-    end_long, end_lat : float
-        The longitude and latitude of the end point.
+    long1, lat1 : float
+        The longitude and latitude of the first point.
+    long2, lat2 : float
+        The longitude and latitude of the second point.
     R : float, optional
         The radius of the Earth in km (default value is 6371).
 

@@ -140,6 +140,31 @@ class Locations(object):
 
         return textwrap.dedent(s)
 
+    @classmethod
+    def from_data(cls, location_mat, data_mat):
+        N, _ = data_mat.shape
+        assert (data_mat < 0).sum() == 0, f'data matrix should be non-negative'
+        assert data_mat.shape == (N, N), 'data_mat is not NxN'
+
+        # NB: We remove the diagonal from the data matrix BEFORE calculating
+        # outflow and inflow
+        if sparse.issparse(data_mat):
+            input_mat = utils.sparsemat_remove_diag(data_mat)  # creates a copy
+        else:
+            input_mat = data_mat.copy()
+            input_mat[np.diag_indices(N)] = 0
+
+        # Row and column sums for dense and sparse matrices
+        outflow = np.asarray(input_mat.sum(axis=1)).flatten()
+        inflow = np.asarray(input_mat.sum(axis=0)).flatten()
+
+        coords = True if location_mat.shape == (N, 2) else False
+
+        locs = cls(N, location_mat, outflow, inflow, use_coords=coords)
+        locs.data = data_mat
+
+        return locs
+
     @property
     def data(self):
         """Retrieve the data stored inside the object."""
@@ -813,33 +838,6 @@ class Locations(object):
         return idx_plus, idx_minus
 
 
-class DataLocations(Locations):
-
-    def __init__(self, location_mat, data_mat):
-        N, _ = data_mat.shape
-        assert (data_mat < 0).sum() == 0, f'data matrix should be non-negative'
-        assert data_mat.shape == (N, N), 'data_mat is not NxN'
-
-        # NB: We remove the diagonal from the data matrix BEFORE calculating
-        # outflow and inflow
-        if sparse.issparse(data_mat):
-            input_mat = utils.sparsemat_remove_diag(data_mat)  # creates a copy
-        else:
-            input_mat = data_mat.copy()
-            input_mat[np.diag_indices(N)] = 0
-
-        # Row and column sums for dense and sparse matrices
-        outflow = np.asarray(input_mat.sum(axis=1)).flatten()
-        inflow = np.asarray(input_mat.sum(axis=0)).flatten()
-
-        coords = True if location_mat.shape == (N, 2) else False
-        super().__init__(N, location_mat, outflow,
-                         inflow, use_coords=coords)
-        self.data = data_mat
-
-        return None
-
-
 # Outside the classes
 # def _binomial_pvalues(N: int, p: float, x: int) -> Tuple[float, float]:
 #     """
@@ -937,7 +935,7 @@ def CPL(F1: Array, F2: Array, rel_tol: float = 1e-3) -> float:
     return 2 * np.sum(prod) / (np.sum(bool_F1) + np.sum(bool_F2))
 
 
-def RMSE(F1: Array, F2: Array, rel_tol: float = 1e-3) -> float:
+def RMSE(F1: Array, F2: Array, rel_tol: float = 1e-3, norm=True) -> float:
     """
     Calculate root-mean-square error between two models.
 
@@ -958,8 +956,12 @@ def RMSE(F1: Array, F2: Array, rel_tol: float = 1e-3) -> float:
 
     diff = F1 - F2
     power = diff.power(2) if sparse.issparse(diff) else np.power(diff, 2)
+    out = np.sqrt(power.sum() / N)
 
-    return np.sqrt(power.sum() / N)
+    if norm:
+        out *= N / x
+
+    return out
 
 
 # def _iterative_proportional_fit(f_mat: Array,

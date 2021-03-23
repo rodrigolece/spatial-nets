@@ -1,14 +1,12 @@
 import argparse
 from pathlib import Path
 import numpy as np
-import graph_tool.all as gt
 from tqdm import tqdm
 
-from expert import experiment, summarise_results
+from spatial_nets.validation import Experiment
 
 
 def main(output_dir):
-
     parser = argparse.ArgumentParser()
     parser.add_argument('model')
     parser.add_argument('nb_repeats', type=int)
@@ -16,7 +14,6 @@ def main(output_dir):
     parser.add_argument('-m', type=int, default=20)
     parser.add_argument('--ell', type=float, default=1.0)
     parser.add_argument('--epsilon', type=float, default=0.0)
-    parser.add_argument('--directed', action='store_true')
     parser.add_argument('-s', '--globalseed', type=int, default=0)
     parser.add_argument('--nosave', action='store_true')  # for testing
     parser.add_argument('-v', '--verbose', action='store_true')
@@ -29,7 +26,7 @@ def main(output_dir):
     m = args.m
     ell = args.ell
     epsilon = args.epsilon
-    directed = args.directed
+    directed = True
     N = 100  # nb_of nodes
     rho = 100
 
@@ -48,24 +45,27 @@ def main(output_dir):
     best_fix = [np.zeros_like(beta) for _ in range(4)]
 
     for j in tqdm(range(m)):
-        params = (ell, beta[j], epsilon)
+        params = {'ell': ell, 'beta': beta[j], 'epsilon': epsilon}
 
-        res, res_fix = experiment(
+        exp = Experiment(
             N, rho, params, model,
             benchmark='cerina',
-            nb_repeats=nb_repeats,
-            nb_net_repeats=nb_net_repeats,
-            start_seed=args.globalseed,
             directed=directed,
             verbose=args.verbose
         )
 
-        mn_res, std_res, best_res = summarise_results(res)
+        res, res_fix = exp.repeated_runs(
+            nb_repeats=nb_repeats,
+            nb_net_repeats=nb_net_repeats,
+            start_seed=args.globalseed
+        )
+
+        mn_res, std_res, best_res = exp.summarise_results(res)
         mn[0][j], mn[1][j], mn[2][j], mn[3][j] = mn_res
         std[0][j], std[1][j], std[2][j], std[3][j] = std_res
         best[0][j], best[1][j], best[2][j], best[3][j] = best_res
 
-        mn_res, std_res, best_res = summarise_results(res_fix)
+        mn_res, std_res, best_res = exp.summarise_results(res_fix)
         mn_fix[0][j], mn_fix[1][j], mn_fix[2][j], mn_fix[3][j] = mn_res
         std_fix[0][j], std_fix[1][j], std_fix[2][j], std_fix[3][j] = std_res
         best_fix[0][j], best_fix[1][j], best_fix[2][j], best_fix[3][j] = best_res
@@ -105,14 +105,13 @@ def main(output_dir):
         })
 
     if not args.nosave:
-        dir_name = 'directed_' if directed else ''
         params_name = f'{ell:.1f}-{epsilon:.1f}_'
 
-        filename = f'{dir_name}{params_name}beta_{model}_{nb_repeats}_{nb_net_repeats}.npz'
+        filename = f'{params_name}beta_{model}_{nb_repeats}_{nb_net_repeats}.npz'
         print(f'\nWriting results to {filename}')
         np.savez(output_dir / filename, **save_dict)
 
-        filename = f'{dir_name}{params_name}beta_fixB_{model}_{nb_repeats}_{nb_net_repeats}.npz'
+        filename = f'{params_name}beta_fixB_{model}_{nb_repeats}_{nb_net_repeats}.npz'
         print(f'Writing results with fixed B to {filename}')
         np.savez(output_dir / filename, **save_dict_fix)
 
