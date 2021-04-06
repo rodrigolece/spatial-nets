@@ -23,10 +23,10 @@ def mean_comm_sizes(state: gt.BlockState, dmat: np.ndarray):
 
 
 def mean_composition(
-        state: gt.BlockState,
-        format_vec: np.ndarray,
-        norm: bool = True
-    ):
+    state: gt.BlockState,
+    format_vec: np.ndarray,
+    norm: bool = True,
+):
     # TODO: pass format_vec as vertex properties
     B = state.get_nonempty_B()
 
@@ -60,7 +60,7 @@ def jaccard_score(state: gt.BlockState, coords: np.ndarray):
     data = []
 
     for i in range(B):
-        for j in range(i+1, B):
+        for j in range(i + 1, B):
             if geoms[i].overlaps(geoms[j]):
                 idx_i.append(i)
                 idx_j.append(j)
@@ -84,4 +84,3 @@ def repeat_sbm_fit(G, nb_repeats, **gt_kwargs):
         Bs[k] = s.get_nonempty_B()
 
     return states, entropies, Bs
-

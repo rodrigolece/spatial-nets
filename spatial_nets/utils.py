@@ -14,11 +14,11 @@ import graph_tool as gt
 from sklearn.metrics import pairwise
 
 
-#__all__ = [
-#    'sparsemat_from_flow', 'sparsemat_remove_diag',
-#    'load_dmat', 'load_flows',
-#    'benchmark_cerina', 'greatcircle_distance'
-#]
+# __all__ = [
+#    "sparsemat_from_flow", "sparsemat_remove_diag",
+#    "load_dmat", "load_flows",
+#    "benchmark_cerina", "greatcircle_distance"
+# ]
 
 
 def _get_iterable(x):
@@ -53,21 +53,21 @@ def build_graph(mat, idx=None, directed=True, coords=None, vertex_properties={})
     G.add_edge_list(np.transpose(A.nonzero()))
 
     if coords is not None:
-        pos = G.new_vertex_property('vector<double>')
+        pos = G.new_vertex_property("vector<double>")
         cairo = coords.T * [[1], [-1]]
         # cairo's origin is top left and y increases downwards
         pos.set_2d_array(cairo)
-        G.vertex_properties['pos'] = pos
+        G.vertex_properties["pos"] = pos
 
     for name, vals in vertex_properties.items():
         if isinstance(vals[0], str):
-            value_type = 'string'
+            value_type = "string"
         elif isinstance(vals[0], (np.floating, float)):
-            value_type = 'float'
+            value_type = "float"
         elif isinstance(vals[0], (np.integer, int)):
-            value_type = 'int'
+            value_type = "int"
         else:
-            raise Exception('vertex_property type is not supported')
+            raise Exception("vertex_property type is not supported")
 
         vp = G.new_vertex_property(value_type, vals=vals)
         G.vertex_properties[name] = vp
@@ -75,34 +75,31 @@ def build_graph(mat, idx=None, directed=True, coords=None, vertex_properties={})
     return G
 
 
-def build_significant_graph(locs,
-                            model,
-                            sign='plus',
-                            coords=None,
-                            significance=0.01,
-                            verbose=False):
+def build_significant_graph(
+    locs, model, sign="plus", coords=None, significance=0.01, verbose=False
+):
 
-    assert sign in ('plus', 'minus'), 'Invalid sign'
+    assert sign in ("plus", "minus"), "Invalid sign"
 
-    family, ct = model.split('-')
+    family, ct = model.split("-")
 
-    pvalue_ct = 'production' if ct == 'doubly' else ct
+    pvalue_ct = "production" if ct == "doubly" else ct
     # we default to production for the pvalues for the DC model
 
-    if family == 'gravity':
-        if ct == 'production':
+    if family == "gravity":
+        if ct == "production":
             c, *other, b = locs.gravity_calibrate_nonlinear(constraint_type=ct)
             fmat = locs.gravity_matrix(c, α=0, β=b)
 
-        elif ct == 'attraction':
+        elif ct == "attraction":
             c, a, *other = locs.gravity_calibrate_nonlinear(constraint_type=ct)
             fmat = locs.gravity_matrix(c, α=a, β=0)
 
-        elif ct == 'doubly':
+        elif ct == "doubly":
             c, *other = locs.gravity_calibrate_nonlinear(constraint_type=ct)
             fmat = locs.gravity_matrix(c, α=0, β=0)
 
-    elif family == 'radiation':
+    elif family == "radiation":
         fmat = locs.radiation_matrix(finite_correction=False)
 
     else:
@@ -112,7 +109,7 @@ def build_significant_graph(locs,
     pmat = locs.probability_matrix(T_model, pvalue_ct)
 
     pvals = locs.pvalues_exact(pmat, constraint_type=pvalue_ct)
-    pvals = pvals[:, 0] if sign == 'plus' else pvals[:, 1]
+    pvals = pvals[:, 0] if sign == "plus" else pvals[:, 1]
     idx = pvals < significance
 
     out = build_graph(locs.data, idx, coords=coords, directed=True)
@@ -122,33 +119,33 @@ def build_significant_graph(locs,
 
 def build_weighted_graph(coo_mat, directed=False, coords=None, vertex_properties={}):
     """Build a weigthed Graph from COO sparse matrix."""
-    assert sp.isspmatrix_coo(coo_mat), 'error: wrong matrix type'
+    assert sp.isspmatrix_coo(coo_mat), "error: wrong matrix type"
 
     nb_nodes, _ = coo_mat.shape
     G = gt.Graph(directed=directed)
     G.add_vertex(nb_nodes)
 
-    weight = G.new_edge_property('int')
+    weight = G.new_edge_property("int")
     edge_list = zip(coo_mat.row, coo_mat.col, coo_mat.data)
     G.add_edge_list(edge_list, eprops=[weight])
-    G.edge_properties['weight'] = weight
+    G.edge_properties["weight"] = weight
 
     if coords is not None:
-        pos = G.new_vertex_property('vector<double>')
+        pos = G.new_vertex_property("vector<double>")
         cairo = coords.T * [[1], [-1]]
         # cairo's origin is top left and y increases downwards
         pos.set_2d_array(cairo)
-        G.vertex_properties['pos'] = pos
+        G.vertex_properties["pos"] = pos
 
     for name, vals in vertex_properties.items():
         if isinstance(vals[0], str):
-            value_type = 'string'
+            value_type = "string"
         elif isinstance(vals[0], (np.floating, float)):
-            value_type = 'float'
+            value_type = "float"
         elif isinstance(vals[0], (np.integer, int)):
-            value_type = 'int'
+            value_type = "int"
         else:
-            raise Exception('vertex_property type is not supported')
+            raise Exception("vertex_property type is not supported")
 
         vp = G.new_vertex_property(value_type, vals=vals)
         G.vertex_properties[name] = vp
@@ -161,13 +158,13 @@ def critical_enveloppes(locs, T_model, idx_plus, idx_minus):
     observed = np.asarray(locs.data[i, j]).flatten()
     predicted = T_model[i, j]
 
-    plus = pd.DataFrame({'x': observed[idx_plus], 'y': predicted[idx_plus]})
-    plus = plus.groupby('x')['y'].max().sort_index()
+    plus = pd.DataFrame({"x": observed[idx_plus], "y": predicted[idx_plus]})
+    plus = plus.groupby("x")["y"].max().sort_index()
     idx = ~(plus < plus.cummax())
     top = plus.loc[idx]
 
-    minus = pd.DataFrame({'x': observed[idx_minus], 'y': predicted[idx_minus]})
-    minus = minus.groupby('x')['y'].min().sort_index()[::-1]
+    minus = pd.DataFrame({"x": observed[idx_minus], "y": predicted[idx_minus]})
+    minus = minus.groupby("x")["y"].min().sort_index()[::-1]
     idx = ~(minus > minus.cummin())
     bottom = minus.loc[idx]
 
@@ -191,7 +188,7 @@ def sparsemat_remove_diag(spmat):
     mat = spmat.copy()
 
     with warnings.catch_warnings():
-        warnings.simplefilter('ignore')
+        warnings.simplefilter("ignore")
         mat[np.diag_indices_from(mat)] = 0
         mat.eliminate_zeros()
 
@@ -238,15 +235,8 @@ def sparsemat_remove_diag(spmat):
 
 
 def benchmark_cerina(
-        nb_nodes,
-        edge_density,
-        ell,
-        beta,
-        epsilon,
-        L=1.0,
-        directed=False,
-        seed=0
-    ):
+    nb_nodes, edge_density, ell, beta, epsilon, L=1.0, directed=False, seed=0
+):
     """Create a benchmark network of the type proposed by Cerina et al."""
     N = nb_nodes
 
@@ -260,7 +250,7 @@ def benchmark_cerina(
     ds = rng.exponential(scale=ell, size=N)
     alphas = 2 * np.pi * rng.rand(N)
     shift = L * np.ones(N)
-    shift[N // 2:] *= -1
+    shift[N // 2 :] *= -1
 
     xs = ds * np.cos(alphas) + shift
     ys = ds * np.sin(alphas)
@@ -292,7 +282,7 @@ def benchmark_cerina(
     probas /= probas.sum()  # normalization
 
     draw = rng.multinomial(nb_edges, probas)
-    idx, = draw.nonzero()
+    (idx,) = draw.nonzero()
     mat = sp.coo_matrix((draw[idx], (i[idx], j[idx])), shape=(N, N))
 
     if not directed:
@@ -305,25 +295,18 @@ def benchmark_cerina(
 
 
 def benchmark_expert(
-        nb_nodes,
-        edge_density,
-        lamb,
-        gamma,
-        L=100.0,
-        directed=False,
-        seed=0
-    ):
+    nb_nodes, edge_density, lamb, gamma, L=100.0, directed=False, seed=0
+):
     """Create a benchmark network of the type proposed by Expert et al."""
     lamb = _get_iterable(lamb)
     if directed:
         assert len(lamb) == 2
     else:
-        assert len(lamb) == 1, \
-                'lamb should be scalar for undirected network'
+        assert len(lamb) == 1, "lamb should be scalar for undirected network"
 
     N = nb_nodes
 
-    nb_edges = int(N * (N - 1) * edge_density )
+    nb_edges = int(N * (N - 1) * edge_density)
     if not directed:
         nb_edges //= 2
 
@@ -355,18 +338,18 @@ def benchmark_expert(
         i = np.concatenate((i, k))
         j = np.concatenate((j, l))
 
-    probas = smat[i, j] / (dmat[i, j]**gamma)
+    probas = smat[i, j] / (dmat[i, j] ** gamma)
     probas /= probas.sum()  # normalization
 
     draw = rng.multinomial(nb_edges, probas)
-    idx, = draw.nonzero()
+    (idx,) = draw.nonzero()
     mat = sp.coo_matrix((draw[idx], (i[idx], j[idx])), shape=(N, N))
 
     if not directed:
         mat = (mat + mat.T).tocoo()  # addition changes to csr
 
     # more useful values in atrribute vector
-    comm_vec[N // 2:] = 0
+    comm_vec[N // 2 :] = 0
 
     return coords, comm_vec, mat
 
@@ -388,8 +371,9 @@ def greatcircle_distance(long1, lat1, long2, lat2, R=6371):
     Dphi = phi1 - phi2  # abs value not needed because of sin squared
     Dlambda = lambda1 - lambda2
 
-    radical = np.sin(Dphi / 2)**2 + np.cos(phi1) * \
-        np.cos(phi2) * np.sin(Dlambda / 2)**2
+    radical = (
+        np.sin(Dphi / 2) ** 2 + np.cos(phi1) * np.cos(phi2) * np.sin(Dlambda / 2) ** 2
+    )
 
     return R * 2 * np.arcsin(np.sqrt(radical))
 
@@ -397,8 +381,8 @@ def greatcircle_distance(long1, lat1, long2, lat2, R=6371):
 def project_mercator(longlat, R=6371):
     """Project longitude and latitute to Mercator."""
     rad = np.radians(longlat)  # lambda, phi
-    x = R * rad[:,0]
-    y = R * np.log(np.tan(np.pi/4 + rad[:,1]/2))
+    x = R * rad[:, 0]
+    y = R * np.log(np.tan(np.pi / 4 + rad[:, 1] / 2))
 
     return np.vstack((x, y)).T
 
@@ -418,17 +402,18 @@ def load_dmat(file: str, exclude_positions: List[int] = None):
     np.array
 
     """
-    assert (ext := os.path.splitext(file)[1]) in ('.mat', '.npz'), \
-            f"unsupported format: {ext} (use '.mat' or '.npz')"
+    assert (ext := os.path.splitext(file)[1]) in (
+        ".mat",
+        ".npz",
+    ), f"unsupported format: {ext} (use '.mat' or '.npz')"
 
-    dmat = loadmat(file)['dmat'] if ext == '.mat' else sp.load_npz(file)
+    dmat = loadmat(file)["dmat"] if ext == ".mat" else sp.load_npz(file)
 
     m, n = dmat.shape
-    assert m == n, 'matrix should be square'
+    assert m == n, "matrix should be square"
 
     idx_diag = np.diag_indices(n)
-    assert np.allclose(dmat[idx_diag], 0.0), \
-        'diagonal elements should be zero'
+    assert np.allclose(dmat[idx_diag], 0.0), "diagonal elements should be zero"
 
     idx_tril = np.tril_indices(n, -1)
     if np.allclose(dmat[idx_tril], 0.0):
@@ -462,25 +447,30 @@ def load_flows(file: Union[str, Path], zero_diag: bool = True):
     sp.csr.csr_matrix
 
     """
-    assert (ext := os.path.splitext(file)[1]) in ('.npz', '.csv', 'adj'), \
-           f"unsupported format: {ext} (use '.npz', '.csv' or '.adj')"
+    assert (ext := os.path.splitext(file)[1]) in (
+        ".npz",
+        ".csv",
+        "adj",
+    ), f"unsupported format: {ext} (use '.npz', '.csv' or '.adj')"
 
-    if ext == '.npz':
+    if ext == ".npz":
         out = sp.load_npz(file)
 
-    elif ext in ('.csv', '.adj'):
+    elif ext in (".csv", ".adj"):
         df = pd.read_csv(file, header=0)
         df.columns = df.columns.str.lower()
 
-        col_names = ['origin', 'destination', 'flow']
+        col_names = ["origin", "destination", "flow"]
 
-        if ext == '.adj':
-            adj_colnames_map = {'previous_store_id': 'origin',
-                                'store_id': 'destination',
-                                'visits': 'flow'}
+        if ext == ".adj":
+            adj_colnames_map = {
+                "previous_store_id": "origin",
+                "store_id": "destination",
+                "visits": "flow",
+            }
             df.rename(adj_colnames_map, axis=1, inplace=True)
 
-        idx_positive = (df.flow > 0)
+        idx_positive = df.flow > 0
         df = df.loc[idx_positive, col_names].reset_index(drop=True)
 
         out = sparsemat_from_flow(df, return_ids=False)

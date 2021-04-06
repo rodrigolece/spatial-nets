@@ -9,28 +9,28 @@ from spatial_nets import utils
 
 class Experiment(object):
     def __init__(
-            self,
-            N: int,
-            rho: float,
-            params: Dict,
-            model: str,
-            benchmark: str = 'expert',
-            sign: str = 'plus',
-            significance: float = 0.01,
-            directed: bool = False,
-            verbose: bool = False,
-        ) -> None:
+        self,
+        N: int,
+        rho: float,
+        params: Dict,
+        model: str,
+        benchmark: str = "expert",
+        sign: str = "plus",
+        significance: float = 0.01,
+        directed: bool = False,
+        verbose: bool = False,
+    ) -> None:
 
-        assert model.startswith(('gravity', 'radiation'))
-        assert model.endswith(('production', 'attraction', 'doubly'))
-        assert benchmark in (('expert', 'cerina')), f'invalid benchmark: {benchmark}'
-        assert sign in (('plus', 'minus'))
+        assert model.startswith(("gravity", "radiation"))
+        assert model.endswith(("production", "attraction", "doubly"))
+        assert benchmark in (("expert", "cerina")), f"invalid benchmark: {benchmark}"
+        assert sign in (("plus", "minus"))
 
         self.N = N
         self.rho = rho
         self.params = params
         self.model = model
-        self.benchmark = getattr(utils, f'benchmark_{benchmark}')
+        self.benchmark = getattr(utils, f"benchmark_{benchmark}")
         self.sign = sign
         self.significance = significance
         self.directed = directed
@@ -46,16 +46,14 @@ class Experiment(object):
     def benchmark_graph(self, seed=0, return_backbone=True):
 
         coords, comm_vec, coo_mat = self.benchmark(
-            self.N, self.rho, **self.params,
-            seed=seed,
-            directed=self.directed
+            self.N, self.rho, **self.params, seed=seed, directed=self.directed
         )
 
         bench = utils.build_weighted_graph(
             coo_mat,
             directed=self.directed,
             coords=coords,
-            vertex_properties={'b': comm_vec}
+            vertex_properties={"b": comm_vec},
         )
 
         # block_state = gt.BlockState(bench, b=bench.vp.b)
@@ -70,7 +68,7 @@ class Experiment(object):
                 sign=self.sign,
                 coords=coords,
                 significance=self.significance,
-                verbose=self.verbose
+                verbose=self.verbose,
             )
 
             if self.verbose:
@@ -79,12 +77,12 @@ class Experiment(object):
         return (bench, backbone) if return_backbone else bench
 
     def repeated_runs(
-            self,
-            nb_repeats: int = 1,
-            nb_net_repeats: int = 1,
-            start_seed: int = 0,
-            **gt_kwargs
-        ):
+        self,
+        nb_repeats: int = 1,
+        nb_net_repeats: int = 1,
+        start_seed: int = 0,
+        **gt_kwargs,
+    ):
 
         # overlap, nmi, vi, B, entropy
         out = np.zeros((nb_repeats * nb_net_repeats, 5))
@@ -92,13 +90,12 @@ class Experiment(object):
 
         for k in range(nb_net_repeats):
             bench, backbone = self.benchmark_graph(
-                seed=start_seed + k,
-                return_backbone=True
+                seed=start_seed + k, return_backbone=True
             )
             x = bench.vp.b.a
 
             for i in range(nb_repeats):
-                row = k*nb_repeats + i
+                row = k * nb_repeats + i
 
                 # Varying B
                 state = gt.minimize_blockmodel_dl(backbone)
@@ -119,11 +116,10 @@ class Experiment(object):
         return out, out_fix
 
     def summarise_results(self, mat):
-        mn= mat[:,:-1].mean(axis=0)
-        std = mat[:,:-1].std(axis=0)
+        mn = mat[:, :-1].mean(axis=0)
+        std = mat[:, :-1].std(axis=0)
 
-        k = mat[:,-1].argmin()
+        k = mat[:, -1].argmin()
         best = mat[k, :-1]
 
         return mn, std, best
-

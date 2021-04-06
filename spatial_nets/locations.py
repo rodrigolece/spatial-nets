@@ -50,12 +50,15 @@ class Locations(object):
 
     """
 
-    def __init__(self, N: int,
-                 location_mat: Array,
-                 orig_relvec: Array,
-                 dest_relvec: Array = None,
-                 comm_vec: Array = None,
-                 use_coords: bool = False) -> None:
+    def __init__(
+        self,
+        N: int,
+        location_mat: Array,
+        orig_relvec: Array,
+        dest_relvec: Array = None,
+        comm_vec: Array = None,
+        use_coords: bool = False,
+    ) -> None:
         """
         Instantiate the Locations object.
 
@@ -85,16 +88,16 @@ class Locations(object):
             between locations.
 
         """
-        assert (location_mat.shape == (N, 2) and use_coords) \
-            or location_mat.shape == (N, N), \
-            'location_mat is not NxN (distances), or Nx2 (coords) with `use_coords=True`'
-        assert len(orig_relvec) == N, 'orig_relvec should have length N'
+        assert len(orig_relvec) == N, "vec should have length N"
 
+        shp = location_mat.shape
         if use_coords:
+            assert shp == (N, 2), "expected size Nx2 (`use_coords=True` was passed)"
             self.dmat = pairwise.euclidean_distances(location_mat)
+
         else:
-            assert not np.any(location_mat < 0), \
-                'distance_matrix should be non_negative'
+            assert shp == (N, N), "expected size NxN"
+            assert not np.any(location_mat < 0), "matrix should be non_negative"
             self.dmat = location_mat
 
         self.N = N
@@ -102,19 +105,16 @@ class Locations(object):
         self._data = None
         # self._datasparseflag = False  # Currently not used
 
-        assert np.all(self.orig_rel > 0), \
-            'origin relevance of locations should be positive'
+        assert np.all(self.orig_rel > 0), "vec should have positive entries"
 
         if dest_relvec is None:
             self.dest_rel = self.orig_rel  # binding to avoid duplicate data
             self._tworelevancesflag = False
         else:
-            assert len(dest_relvec) == N, \
-                'dest_relvec should have length N'
+            assert len(dest_relvec) == N, "vec should have length N"
             self.dest_rel = np.array(dest_relvec)  # prefer arr
             self._tworelevancesflag = True
-            assert np.all(self.dest_rel > 0), \
-                'destination relevance of locations should be positive'
+            assert np.all(self.dest_rel > 0), "vec should have positive etries"
 
         if comm_vec is None:
             self.k = 1
@@ -133,18 +133,18 @@ class Locations(object):
                     N={self.N} and k={self.k}
                 """
         else:
-            s = f'Locations object: N={self.N} and k={self.k}'
+            s = f"Locations object: N={self.N} and k={self.k}"
 
         if self.data is not None:
-            s = s + '\n -- Data has been set'
+            s = s + "\n -- Data has been set"
 
         return textwrap.dedent(s)
 
     @classmethod
     def from_data(cls, location_mat, data_mat):
         N, _ = data_mat.shape
-        assert (data_mat < 0).sum() == 0, f'data matrix should be non-negative'
-        assert data_mat.shape == (N, N), 'data_mat is not NxN'
+        assert (data_mat < 0).sum() == 0, f"data matrix should be non-negative"
+        assert data_mat.shape == (N, N), "data_mat is not NxN"
 
         # NB: We remove the diagonal from the data matrix BEFORE calculating
         # outflow and inflow
@@ -173,9 +173,9 @@ class Locations(object):
     @data.setter
     def data(self, data_mat: Array):
         """Set a copy of the data inside the object."""
-        assert (data_mat < 0).sum() == 0, f'data matrix should be non-negative'
+        assert (data_mat < 0).sum() == 0, f"data matrix should be non-negative"
         # Test above works for dense and sparse matrices
-        assert data_mat.shape == (self.N, self.N), 'data_mat is not NxN'
+        assert data_mat.shape == (self.N, self.N), "data_mat is not NxN"
 
         # NB: We remove the diagonal from the data matrix BEFORE calculating
         # outflow and inflow
@@ -222,7 +222,7 @@ class Locations(object):
 
         for i, idx in enumerate(idx_mat):
             masked_rel.mask = masked_dmat[i].mask
-            masked_rel[i] = ma.masked        # origin is not used
+            masked_rel[i] = ma.masked  # origin is not used
             masked_rel[idx[-1]] = ma.masked  # the furthest point is not used
 
             rolled_idx = np.roll(idx, 1)
@@ -230,9 +230,12 @@ class Locations(object):
 
         return S
 
-    def radiation_matrix(self, threshold: float = np.inf,
-                         finite_correction: bool = True,
-                         **kwargs) -> Array:
+    def radiation_matrix(
+        self,
+        threshold: float = np.inf,
+        finite_correction: bool = True,
+        **kwargs,
+    ) -> Array:
         """
         Calculate the radiation matrix.
 
@@ -257,7 +260,7 @@ class Locations(object):
 
         num = m * n.T
         den = (m + S) * (m + n.T + S)
-        with np.errstate(invalid='ignore'):
+        with np.errstate(invalid="ignore"):
             # 0/0 inside arrays is invalid floating point, not divide error;
             # to cover the case m_i + S_ij = 0 (can occur when m_i is zero)
             out = num / den
@@ -267,13 +270,14 @@ class Locations(object):
 
         if finite_correction:
             M = np.sum(m)
-            norm = (1 - m / M)  # column vector
+            norm = 1 - m / M  # column vector
             out = out / norm  # each row is scaled
 
         return out
 
-    def gravity_matrix(self, γ: float,
-                       α: float = 1.0, β: float = 1.0, **kwargs) -> Array:
+    def gravity_matrix(
+        self, γ: float, α: float = 1.0, β: float = 1.0, **kwargs
+    ) -> Array:
         """
         Calculate the gravity matrix.
 
@@ -293,7 +297,7 @@ class Locations(object):
         m = self.orig_rel[:, np.newaxis]  # column vector
         n = self.dest_rel[:, np.newaxis]  # column vector
 
-        with np.errstate(divide='ignore', invalid='raise'):
+        with np.errstate(divide="ignore", invalid="raise"):
             # 0**(-γ) raises divide error, 0 * ∞ raises invalid error in multiply
             dmat_power = self.dmat ** (-γ)
             dmat_power[np.diag_indices(self.N)] = 0.0
@@ -303,10 +307,13 @@ class Locations(object):
 
         return out
 
-    def gravity_calibrate_nonlinear(self, constraint_type: str,
-                                    maxiters=500,
-                                    use_log=False,
-                                    verbose: bool = False) -> Tuple[float, float]:
+    def gravity_calibrate_nonlinear(
+        self,
+        constraint_type: str,
+        maxiters=500,
+        use_log=False,
+        verbose: bool = False,
+    ) -> Tuple[float, float]:
         """
         Calibrate the gravity model using nonlinear least squares.
 
@@ -320,16 +327,20 @@ class Locations(object):
 
         """
         if self.data is None:
-            raise DataNotSet('the data for comparison is needed')
+            raise DataNotSet("the data for comparison is needed")
 
-        assert constraint_type in ['unconstrained', 'production', 'attraction', 'doubly'], \
-            f'invalid constraint {constraint_type}'
+        assert constraint_type in [
+            "unconstrained",
+            "production",
+            "attraction",
+            "doubly",
+        ], f"invalid constraint {constraint_type}"
 
         # The observations
         i, j = self.data.nonzero()
         y = np.asarray(self.data[i, j]).flatten()
 
-        if constraint_type == 'unconstrained':
+        if constraint_type == "unconstrained":
             x0 = [2, 1, 1]
             bounds = ([-np.inf, 0, 0], [np.inf, np.inf, np.inf])
 
@@ -343,7 +354,7 @@ class Locations(object):
                     out = y - T_model[i, j]
                 return out
 
-        elif constraint_type == 'production':
+        elif constraint_type == "production":
             x0 = [1, 1]
             bounds = ([-np.inf, 0], [np.inf, np.inf])
 
@@ -357,7 +368,7 @@ class Locations(object):
                     out = y - T_model[i, j]
                 return out
 
-        elif constraint_type == 'attraction':
+        elif constraint_type == "attraction":
             x0 = [1, 1]
             bounds = ([-np.inf, 0], [np.inf, np.inf])
 
@@ -371,15 +382,19 @@ class Locations(object):
                     out = y - T_model[i, j]
                 return out
 
-        elif constraint_type == 'doubly':
+        elif constraint_type == "doubly":
             x0 = [2]
             bounds = (-np.inf, np.inf)
 
             def cost_fun(x):  # gamma
                 fmat = self.gravity_matrix(x[0], α=0, β=0)
-                T_model = simple_ipf(fmat, self.data_out, self.data_in,
-                                     maxiters=maxiters,
-                                     verbose=verbose)
+                T_model = simple_ipf(
+                    fmat,
+                    self.data_out,
+                    self.data_in,
+                    maxiters=maxiters,
+                    verbose=verbose,
+                )
                 if use_log:
                     out = np.log(y) - np.log(T_model[i, j])
                 else:
@@ -388,25 +403,25 @@ class Locations(object):
 
         res = optimize.least_squares(cost_fun, x0, bounds=bounds)
         st = res.status
-        assert st > 0, f'optimization exit status is failure'
+        assert st > 0, f"optimization exit status is failure"
 
         st_dict = {
-            -1: 'improper input parameters status returned from MINPACK.',
-            0: 'the maximum number of function evaluations is exceeded.',
-            1: 'gtol termination condition is satisfied.',
-            2: 'ftol termination condition is satisfied.',
-            3: 'xtol termination condition is satisfied.',
-            4: 'Both ftol and xtol termination conditions are satisfied.'
+            -1: "improper input parameters status returned from MINPACK.",
+            0: "the maximum number of function evaluations is exceeded.",
+            1: "gtol termination condition is satisfied.",
+            2: "ftol termination condition is satisfied.",
+            3: "xtol termination condition is satisfied.",
+            4: "Both ftol and xtol termination conditions are satisfied.",
         }
 
         if verbose:
-            print('Status: ', st_dict[st])
+            print("Status: ", st_dict[st])
 
         return res.x
 
-    def gravity_calibrate_cpc(self, constraint_type: str,
-                              maxiters=500,
-                              verbose: bool = False) -> Tuple[float, float]:
+    def gravity_calibrate_cpc(
+        self, constraint_type: str, maxiters=500, verbose: bool = False
+    ) -> Tuple[float, float]:
         """
         Calibrate the gravity model using CPC minisation
 
@@ -420,12 +435,16 @@ class Locations(object):
 
         """
         if self.data is None:
-            raise DataNotSet('the data for comparison is needed')
+            raise DataNotSet("the data for comparison is needed")
 
-        assert constraint_type in ['unconstrained', 'production', 'attraction', 'doubly'], \
-            f'invalid constraint {constraint_type}'
+        assert constraint_type in [
+            "unconstrained",
+            "production",
+            "attraction",
+            "doubly",
+        ], f"invalid constraint {constraint_type}"
 
-        if constraint_type == 'unconstrained':
+        if constraint_type == "unconstrained":
             x0 = [2, 1, 1]
             bounds = [(0, None)] * 3
 
@@ -435,7 +454,7 @@ class Locations(object):
                 T_model = K * fmat
                 return 1 - CPC(T_model, self.data)
 
-        elif constraint_type == 'production':
+        elif constraint_type == "production":
             x0 = [1, 1]
             bounds = [(0, None)] * 2
 
@@ -445,7 +464,7 @@ class Locations(object):
                 T_model = self.data_out[:, np.newaxis] * pmat
                 return 1 - CPC(T_model, self.data)
 
-        elif constraint_type == 'attraction':
+        elif constraint_type == "attraction":
             x0 = [1, 1]
             bounds = [(0, None)] * 2
 
@@ -455,27 +474,32 @@ class Locations(object):
                 T_model = pmat * self.data_in[np.newaxis, :]
                 return 1 - CPC(T_model, self.data)
 
-        elif constraint_type == 'doubly':
+        elif constraint_type == "doubly":
             x0 = [2]
             bounds = [(0, None)]
 
             def cost_fun(x):  # gamma
                 fmat = self.gravity_matrix(x[0], α=0, β=0)
-                T_model = simple_ipf(fmat, self.data_out, self.data_in,
-                                     maxiters=maxiters,
-                                     verbose=verbose)
+                T_model = simple_ipf(
+                    fmat,
+                    self.data_out,
+                    self.data_in,
+                    maxiters=maxiters,
+                    verbose=verbose,
+                )
                 return 1 - CPC(T_model, self.data)
 
         res = optimize.minimize(cost_fun, x0, bounds=bounds)
         # assert res.sucess, f'optimization exit status is failure'
 
         if verbose:
-            print('Status: ', res.message)
+            print("Status: ", res.message)
 
         return res.x
 
-    def gravity_calibrate_all(self, verbose: bool = False,
-                              **kwargs) -> Tuple[float, float, float]:
+    def gravity_calibrate_all(
+        self, verbose: bool = False, **kwargs
+    ) -> Tuple[float, float, float]:
         """
         Calibrate the all of the gravity parameters using linear least squares.
 
@@ -490,7 +514,7 @@ class Locations(object):
 
         """
         if self.data is None:
-            raise DataNotSet('the data for comparison is needed')
+            raise DataNotSet("the data for comparison is needed")
 
         N = self.N
 
@@ -500,7 +524,7 @@ class Locations(object):
 
         # The model data
         m = self.data_out[:, np.newaxis]  # col. vec.
-        n = self.data_in[np.newaxis, :]   # row vec.
+        n = self.data_in[np.newaxis, :]  # row vec.
 
         m_repeated = np.repeat(m, N, axis=1)
         n_repeated = np.repeat(n, N, axis=0)
@@ -520,7 +544,7 @@ class Locations(object):
         # k = np.exp(reg.intercept_)  # in practice works worse than unconstrained
 
         if γ < 0.5:
-            warnings.warn(f'γ = {γ:.3f}')
+            warnings.warn(f"γ = {γ:.3f}")
 
         return γ, α, β
 
@@ -543,46 +567,49 @@ class Locations(object):
             sum to one.
 
         """
-        assert constraint_type in ['production', 'attraction'], \
-            f'invalid constraint {constraint_type}'
+        assert constraint_type in [
+            "production",
+            "attraction",
+        ], f"invalid constraint {constraint_type}"
 
-        assert not sparse.issparse(f_mat), \
-            'sparse matrices are not supported'
+        assert not sparse.issparse(f_mat), "sparse matrices are not supported"
 
         p_mat = f_mat.astype(float)  # to avoid problems with division
 
-        if constraint_type == 'production':
+        if constraint_type == "production":
             # We assume that f_mat is NOT of type  sparse so that sums are flat
             row_sum = f_mat.sum(axis=1)
-            idx = (row_sum > 0)
+            idx = row_sum > 0
             p_mat[idx] = p_mat[idx] / row_sum[idx, np.newaxis]
 
-        elif constraint_type == 'attraction':
+        elif constraint_type == "attraction":
             col_sum = f_mat.sum(axis=0)
-            idx = (col_sum > 0)
+            idx = col_sum > 0
             p_mat[:, idx] = p_mat[:, idx] / col_sum[np.newaxis, idx]
 
         return p_mat
 
     def draw_multinomial(self, p_mat, constraint_type, seed=0):
         """Draw from the constrained model using multinomial distribution."""
-        assert constraint_type in ['production', 'attraction'], \
-            f'invalid constraint {constraint_type}'
+        assert constraint_type in [
+            "production",
+            "attraction",
+        ], f"invalid constraint {constraint_type}"
 
         rng = np.random.RandomState(seed)
 
         out = sparse.lil_matrix((self.N, self.N), dtype=int)
 
-        if constraint_type == 'production':
+        if constraint_type == "production":
             for i in range(self.N):
                 draw = rng.multinomial(self.data_out[i], p_mat[i])
-                j, = draw.nonzero()
+                (j,) = draw.nonzero()
                 out[i, j] = draw[j]
 
-        elif constraint_type == 'attraction':
+        elif constraint_type == "attraction":
             for j in range(self.N):
                 draw = rng.multinomial(self.data_in[j], p_mat[:, j])
-                i, = draw.nonzero()
+                (i,) = draw.nonzero()
                 out[i, j] = draw[i]
 
         return out.tocsr()
@@ -597,10 +624,9 @@ class Locations(object):
 
         return out
 
-    def constrained_model(self, f_mat: Array,
-                          constraint_type: str,
-                          maxiters=500,
-                          verbose=False) -> Array:
+    def constrained_model(
+        self, f_mat: Array, constraint_type: str, maxiters=500, verbose=False
+    ) -> Array:
         """
         Calculate the constrained flux from the affinity matrix f_ij.
 
@@ -616,28 +642,31 @@ class Locations(object):
 
         """
         if self.data is None:
-            raise DataNotSet('the data for the constraints is needed')
+            raise DataNotSet("the data for the constraints is needed")
 
-        assert constraint_type in ['unconstrained', 'production', 'attraction',
-                                   'doubly'], \
-            f'invalid constraint {constraint_type}'
+        assert constraint_type in [
+            "unconstrained",
+            "production",
+            "attraction",
+            "doubly",
+        ], f"invalid constraint {constraint_type}"
 
-        if constraint_type == 'unconstrained':
+        if constraint_type == "unconstrained":
             K = self.data.sum() / f_mat.sum()
             out = K * f_mat
 
-        elif constraint_type == 'production':
+        elif constraint_type == "production":
             p_mat = self.probability_matrix(f_mat, constraint_type)
             out = self.data_out[:, np.newaxis] * p_mat
 
-        elif constraint_type == 'attraction':
+        elif constraint_type == "attraction":
             p_mat = self.probability_matrix(f_mat, constraint_type)
             out = p_mat * self.data_in[np.newaxis, :]
 
-        elif constraint_type == 'doubly':
-            out = simple_ipf(f_mat, self.data_out, self.data_in,
-                             maxiters=maxiters,
-                             verbose=verbose)
+        elif constraint_type == "doubly":
+            out = simple_ipf(
+                f_mat, self.data_out, self.data_in, maxiters=maxiters, verbose=verbose
+            )
 
         return out
 
@@ -729,18 +758,20 @@ class Locations(object):
 
         """
         if self.data is None:
-            raise DataNotSet('the data for comparison is needed')
+            raise DataNotSet("the data for comparison is needed")
 
-        assert constraint_type in ['production', 'attraction'], \
-            f'invalid constraint {constraint_type}'
+        assert constraint_type in [
+            "production",
+            "attraction",
+        ], f"invalid constraint {constraint_type}"
 
         ii, jj = self.data.nonzero()
 
         # Entry-wise first and second moments (binomial model)
         Data = self.data
-        if constraint_type == 'production':
+        if constraint_type == "production":
             Exp = self.data_out[:, np.newaxis] * pmat
-        elif constraint_type == 'attraction':
+        elif constraint_type == "attraction":
             Exp = pmat * self.data_in[np.newaxis, :]
         Std = np.sqrt(Exp * (1 - pmat))
 
@@ -772,33 +803,36 @@ class Locations(object):
 
         """
         if self.data is None:
-            raise DataNotSet('the data for comparison is needed')
+            raise DataNotSet("the data for comparison is needed")
 
-        assert constraint_type in ['production', 'attraction'], \
-            f'invalid constraint {constraint_type}'
+        assert constraint_type in [
+            "production",
+            "attraction",
+        ], f"invalid constraint {constraint_type}"
 
         ii, jj = self.data.nonzero()
         n = len(ii)
         out = np.zeros((n, 2))
 
         # The target N is either the row or the column sum
-        Ns = self.data_out[ii] \
-            if constraint_type == 'production' \
-            else self.data_in[jj]
+        Ns = self.data_out[ii] if constraint_type == "production" else self.data_in[jj]
 
         for k in range(n):
             i, j = ii[k], jj[k]
             x, n, p = self.data[i, j], Ns[k], pmat[i, j]
-            out[k, 0] = stats.binom_test(x, n=n, p=p, alternative='greater')
-            out[k, 1] = stats.binom_test(x, n=n, p=p, alternative='less')
+            out[k, 0] = stats.binom_test(x, n=n, p=p, alternative="greater")
+            out[k, 1] = stats.binom_test(x, n=n, p=p, alternative="less")
 
         return out
 
-    def significant_edges(self, pmat: Array,
-                          constraint_type: str,
-                          significance: float = 0.01,
-                          exact: bool = False,
-                          verbose: bool = False) -> Tuple[Array, Array]:
+    def significant_edges(
+        self,
+        pmat: Array,
+        constraint_type: str,
+        significance: float = 0.01,
+        exact: bool = False,
+        verbose: bool = False,
+    ) -> Tuple[Array, Array]:
         """
         Calculate the significant edges according to a binomial test (or z-test).
 
@@ -818,7 +852,7 @@ class Locations(object):
         edges
 
         """
-        method_name = 'pvalues_' + ('exact' if exact else 'approx')
+        method_name = "pvalues_" + ("exact" if exact else "approx")
         method = getattr(self, method_name)
         pvals = method(pmat, constraint_type)
 
@@ -829,11 +863,13 @@ class Locations(object):
         if verbose:
             n, nplus, nminus = len(pvals), np.sum(idx_plus), np.sum(idx_minus)
             nzero = n - nplus - nminus
-            tab = [['Positive (observed larger)', nplus, f'{100*nplus/n:.2f}'],
-                   ['Negative (model larger)', nminus, f'{100*nminus/n:.2f}'],
-                   ['Not-significant:', nzero, f'{100*nzero/n:.2f}'],
-                   ['Total', n, '100.00']]
-            print(tabulate(tab, headers=['', 'Nb', '%']))
+            tab = [
+                ["Positive (observed larger)", nplus, f"{100*nplus/n:.2f}"],
+                ["Negative (model larger)", nminus, f"{100*nminus/n:.2f}"],
+                ["Not-significant:", nzero, f"{100*nzero/n:.2f}"],
+                ["Total", n, "100.00"],
+            ]
+            print(tabulate(tab, headers=["", "Nb", "%"]))
 
         return idx_plus, idx_minus
 
@@ -895,7 +931,7 @@ def CPC(F1: Array, F2: Array, rel_tol: float = 1e-3) -> float:
 
     """
     x, y = F1.sum(), F2.sum()
-    assert abs((x - y) / x) < rel_tol, 'arrays do not have same sum (up to rel. tol.)'
+    assert abs((x - y) / x) < rel_tol, "arrays do not have same sum (up to rel. tol.)"
     # assert np.isclose(F1.sum(), F2.sum()), 'arrays should have same sum'
 
     denom_mat = F1 + F2
@@ -918,7 +954,7 @@ def CPL(F1: Array, F2: Array, rel_tol: float = 1e-3) -> float:
 
     """
     x, y = F1.sum(), F2.sum()
-    assert abs((x - y) / x) < rel_tol, 'arrays do not have same sum (up to rel. tol.)'
+    assert abs((x - y) / x) < rel_tol, "arrays do not have same sum (up to rel. tol.)"
     # assert np.isclose(F1.sum(), F2.sum()), 'arrays should have same sum'
 
     bool_F1 = F1 > 0
@@ -949,7 +985,7 @@ def RMSE(F1: Array, F2: Array, rel_tol: float = 1e-3, norm=True) -> float:
 
     """
     x, y = F1.sum(), F2.sum()
-    assert abs((x - y) / x) < rel_tol, 'arrays do not have same sum (up to rel. tol.)'
+    assert abs((x - y) / x) < rel_tol, "arrays do not have same sum (up to rel. tol.)"
     # assert np.isclose(F1.sum(), F2.sum()), 'arrays should have same sum'
 
     N = np.prod(F1.shape)
@@ -1097,18 +1133,21 @@ class DataNotSet(Exception):
     pass
 
 
-def simple_ipf(mat: Array,
-               target_rows: Array = None,
-               target_cols: Array = None,
-               return_vecs: bool = False,
-               tol: float = 1e-3,
-               maxiters: int = 100,
-               verbose: bool = False) -> Array:
+def simple_ipf(
+    mat: Array,
+    target_rows: Array = None,
+    target_cols: Array = None,
+    return_vecs: bool = False,
+    tol: float = 1e-3,
+    maxiters: int = 100,
+    verbose: bool = False,
+) -> Array:
     N, _ = mat.shape
     b = np.ones(N)
 
-    assert not (bool(target_rows is None) != bool(target_cols is None)), \
-        'target_rows and target_cols should be provided or not provided together'
+    assert not (
+        bool(target_rows is None) != bool(target_cols is None)
+    ), "target_rows and target_cols should be provided or not provided together"
     # != is exclusive or for normalised boolean variables
 
     if target_rows is None:
@@ -1132,13 +1171,14 @@ def simple_ipf(mat: Array,
             break
 
     if verbose:
-        print(f'Nb iters until convergence: {niter}')
+        print(f"Nb iters until convergence: {niter}")
 
     return (out, a, b) if return_vecs else out
 
 
-def save_model(filename, locs=None, constraint_type=None,
-               grav_params=None, balancing_factors=None):
+def save_model(
+    filename, locs=None, constraint_type=None, grav_params=None, balancing_factors=None
+):
     """
     Save a model storing optionally the locations object, the parameters or
     the balancing factors.
@@ -1148,26 +1188,30 @@ def save_model(filename, locs=None, constraint_type=None,
 
     if locs is not None:
         assert locs.data is not None
-        save_dict['locs'] = locs
+        save_dict["locs"] = locs
 
     if constraint_type is not None:
-        assert constraint_type in ['unconstrained', 'production', \
-                                   'attraction', 'doubly']
-        save_dict['constraint_type'] = constraint_type
+        assert constraint_type in [
+            "unconstrained",
+            "production",
+            "attraction",
+            "doubly",
+        ]
+        save_dict["constraint_type"] = constraint_type
 
     if grav_params is not None:
         assert len(grav_params) == 3
-        save_dict['grav_params'] = grav_params
+        save_dict["grav_params"] = grav_params
 
     if balancing_factors is not None:
         assert len(balancing_factors) == 2
-        save_dict['balancing_factors'] = balancing_factors
+        save_dict["balancing_factors"] = balancing_factors
 
     if len(save_dict) > 0:
-        with open(filename, 'wb') as f:
+        with open(filename, "wb") as f:
             pickle.dump(save_dict, f)
     else:
-        print('Need to provide arguments')
+        print("Need to provide arguments")
 
     return None
 
@@ -1178,39 +1222,39 @@ def load_gravity_model(filename, locs=None, return_locs=False):
     balancing factors.
 
     """
-    with open(filename, 'rb') as f:
+    with open(filename, "rb") as f:
         data = pickle.load(f)
-        constraint_type = data.get('constraint_type')
+        constraint_type = data.get("constraint_type")
 
         if locs is not None:
             pass
-        elif 'locs' in data:
-            locs = data['locs']
+        elif "locs" in data:
+            locs = data["locs"]
         else:
-            raise AttributeError('`locs` not provided')
+            raise AttributeError("`locs` not provided")
 
-        fmat = locs.gravity_matrix(*data['grav_params'])
+        fmat = locs.gravity_matrix(*data["grav_params"])
 
     if constraint_type is None:
         out = fmat
 
-    elif constraint_type == 'unconstrained':
+    elif constraint_type == "unconstrained":
         K = locs.data.sum() / fmat.sum()
         out = K * fmat
 
-    elif constraint_type == 'production':
-        pmat = locs.probability_matrix(fmat, 'production')
+    elif constraint_type == "production":
+        pmat = locs.probability_matrix(fmat, "production")
         out = locs.data_out[:, np.newaxis] * pmat
 
-    elif constraint_type == 'attraction':
-        pmat = locs.probability_matrix(fmat, 'attraction')
+    elif constraint_type == "attraction":
+        pmat = locs.probability_matrix(fmat, "attraction")
         out = pmat * locs.data_in[np.newaxis, :]
 
-    elif constraint_type == 'doubly' and 'balancing_factors' in data:
-        a, b = data['balancing_factors']
+    elif constraint_type == "doubly" and "balancing_factors" in data:
+        a, b = data["balancing_factors"]
         out = a[:, np.newaxis] * fmat * b[np.newaxis, :]
 
-    elif constraint_type == 'doubly':
+    elif constraint_type == "doubly":
         out = simple_ipf(fmat, locs.data_out, locs.data_in)
 
     else:

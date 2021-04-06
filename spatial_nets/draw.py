@@ -11,19 +11,24 @@ from spatial_nets import utils
 # default_cm = gt.default_cm  # 'Set3'
 # The colors below come from plt.get_cmap('Set3').colors
 
-set3_colors = list(plt.get_cmap('Set3').colors)
+set3_colors = list(plt.get_cmap("Set3").colors)
 set3_colors.pop(1)  # the same as Peixoto does in graph-tool
 
-default_cm = colors.LinearSegmentedColormap.from_list(
-    'graphtool-Set3',
-    set3_colors
-)
+default_cm = colors.LinearSegmentedColormap.from_list("graphtool-Set3", set3_colors)
 
 default_names = [
-    'aqua', 'melrose', 'salmon', 'shakespeare', 'rajah', 'sulu',
-    'classic_rose', 'gainsboro', 'plum', 'snowy_mint', 'witch_haze'
+    "aqua",
+    "melrose",
+    "salmon",
+    "shakespeare",
+    "rajah",
+    "sulu",
+    "classic_rose",
+    "gainsboro",
+    "plum",
+    "snowy_mint",
+    "witch_haze",
 ]
-
 
 
 def display_cmap(cmap, N=20, ax=None):
@@ -35,7 +40,7 @@ def display_cmap(cmap, N=20, ax=None):
         _, ax = plt.subplots()
 
     ax.imshow(x, cmap=cmap)
-    ax.axis('off')
+    ax.axis("off")
     ax.set_title(cmap.name)
 
     return None
@@ -46,7 +51,7 @@ def hsv_cmap_from_color(color, min_value, max_value, name):
     h, s, v = colors.rgb_to_hsv(color)
     dark = colors.hsv_to_rgb((h, s, min_value))
     light = colors.hsv_to_rgb((h, s, max_value))
-    cmap = colors.LinearSegmentedColormap.from_list(name+'_hsv', [dark, light])
+    cmap = colors.LinearSegmentedColormap.from_list(name + "_hsv", [dark, light])
 
     return cmap
 
@@ -56,7 +61,7 @@ def hls_cmap_from_color(color, min_value, max_value, name):
     h, l, s = colorsys.rgb_to_hls(*color)
     dark = colorsys.hls_to_rgb(h, min_value, s)
     light = colorsys.hls_to_rgb(h, max_value, s)
-    cmap = colors.LinearSegmentedColormap.from_list(name+'_hls', [dark, light])
+    cmap = colors.LinearSegmentedColormap.from_list(name + "_hls", [dark, light])
 
     return cmap
 
@@ -77,21 +82,15 @@ def setup_default_colormaps(register=True):
             cm.register_cmap(name=hls.name, cmap=hls)
 
             # also register reversed colormaps
-            cm.register_cmap(name=hsv.name + '_r', cmap=hsv.reversed())
-            cm.register_cmap(name=hls.name + '_r', cmap=hls.reversed())
-
+            cm.register_cmap(name=hsv.name + "_r", cmap=hsv.reversed())
+            cm.register_cmap(name=hls.name + "_r", cmap=hls.reversed())
 
     return out
 
 
 def gt_color_legend(
-        state,
-        comms=None,
-        ax=None,
-        norm=None,
-        cmap=default_cm,
-        legendsize=(6, 0.35)
-    ):
+    state, comms=None, ax=None, norm=None, cmap=default_cm, legendsize=(6, 0.35)
+):
     """Axis with discrete colors corresponding to BlockState object."""
     if comms is not None:
         comms = np.unique(comms)
@@ -104,7 +103,7 @@ def gt_color_legend(
     if ax is None:
         _, ax = plt.subplots(figsize=legendsize, squeeze=True)
 
-    ax.imshow(data, aspect='auto', cmap=cmap, norm=norm)
+    ax.imshow(data, aspect="auto", cmap=cmap, norm=norm)
     ax.get_yaxis().set_visible(False)
     ax.get_xaxis().set_ticks(range(B))
 
@@ -114,20 +113,22 @@ def gt_color_legend(
     return None
 
 
-def signed_scatterplot(locs,
-                       T_model,
-                       idx_tuple,
-                       ax,
-                       sample=None,
-                       colors=['C0', 'C1', '0.75'],
-                       alpha=0.2,
-                       fs=18,
-                       rounded=False,
-                       threshold=None):
-    #TODO: colors can be removed, better to use cycler
+def signed_scatterplot(
+    locs,
+    T_model,
+    idx_tuple,
+    ax,
+    sample=None,
+    colors=["C0", "C1", "0.75"],
+    alpha=0.2,
+    fs=18,
+    rounded=False,
+    threshold=None,
+):
+    # TODO: colors can be removed, better to use cycler
 
     idx_tuple = utils._get_iterable(idx_tuple)
-    assert len(idx_tuple) in (2, 3), 'invalid list of indices'
+    assert len(idx_tuple) in (2, 3), "invalid list of indices"
 
     if len(idx_tuple) == 2:
         idx_plus, idx_minus = idx_tuple
@@ -161,21 +162,39 @@ def signed_scatterplot(locs,
         minus_predicted[minus_predicted < threshold] = 0.0
         zero_predicted[zero_predicted < threshold] = 0.0
 
-    ax.plot(minus_observed, minus_predicted, '.',
-            color=colors[0], alpha=alpha, label='negative')
-    ax.plot(plus_observed, plus_predicted, '.',
-            color=colors[1], alpha=alpha, label='positive')
-    ax.plot(zero_observed, zero_predicted, '.',
-            color=colors[2], alpha=alpha, label='not significant')
+    ax.plot(
+        minus_observed,
+        minus_predicted,
+        ".",
+        color=colors[0],
+        alpha=alpha,
+        label="negative",
+    )
+    ax.plot(
+        plus_observed,
+        plus_predicted,
+        ".",
+        color=colors[1],
+        alpha=alpha,
+        label="positive",
+    )
+    ax.plot(
+        zero_observed,
+        zero_predicted,
+        ".",
+        color=colors[2],
+        alpha=alpha,
+        label="not significant",
+    )
 
-    x, X, y, Y  = ax.axis()
-    mM = max(x,y), min(X,Y)
-    ax.plot(mM, mM, ls='--', c='.3', alpha=0.5, label='y=x (diagonal)')
-    ax.set_xscale('log')
-    ax.set_yscale('log')
+    x, X, y, Y = ax.axis()
+    mM = max(x, y), min(X, Y)
+    ax.plot(mM, mM, ls="--", c=".3", alpha=0.5, label="y=x (diagonal)")
+    ax.set_xscale("log")
+    ax.set_yscale("log")
 
-    ax.set_xlabel('Observed flow', fontsize=fs)
-    ax.set_ylabel('Predicted flow', fontsize=fs)
+    ax.set_xlabel("Observed flow", fontsize=fs)
+    ax.set_ylabel("Predicted flow", fontsize=fs)
 
     return None
 
@@ -190,7 +209,7 @@ def contourf(x, y, z, ax, fig, labels=None, colorbar=True, norm=None):
 
     if colorbar:
         divider = make_axes_locatable(ax)
-        cax = divider.append_axes('right', size='5%', pad=0.3)
+        cax = divider.append_axes("right", size="5%", pad=0.3)
         fig.colorbar(im, cax=cax)
         if len(labels) == 3:
             cax.set_ylabel(labels[2], labelpad=10)
@@ -199,16 +218,16 @@ def contourf(x, y, z, ax, fig, labels=None, colorbar=True, norm=None):
 
 
 def selected_comms(
-        state,
-        comms,
-        coords,
-        ax=None,
-        background=False,
-        cmap=default_cm,
-        ms=1,
-        hms=10,
-        legend=False
-    ):
+    state,
+    comms,
+    coords,
+    ax=None,
+    background=False,
+    cmap=default_cm,
+    ms=1,
+    hms=10,
+    legend=False,
+):
     comms = np.unique(comms)
 
     if ax is None:
@@ -218,7 +237,7 @@ def selected_comms(
         out = None
 
     if background:
-        ax.scatter(coords[:, 0], coords[:, 1], s=ms, c='k')
+        ax.scatter(coords[:, 0], coords[:, 1], s=ms, c="k")
 
     if len(comms) > 1:
         bounds = np.linspace(0, len(comms), len(comms) + 1)
@@ -228,22 +247,23 @@ def selected_comms(
 
     for i, c in enumerate(comms):
         idx = state.b.a == c
-        color_vec = np.ones(idx.sum(), dtype=int)*i
+        color_vec = np.ones(idx.sum(), dtype=int) * i
         ax.scatter(
             coords[idx, 0],
             coords[idx, 1],
             s=hms,
             c=color_vec,
             cmap=cmap,
-            norm=norm)
+            norm=norm,
+        )
 
-    ax.axis('equal')
+    ax.axis("equal")
     ax.set_xticks([])
     ax.set_yticks([])
 
     if legend:
         divider = make_axes_locatable(ax)
-        cax = divider.append_axes('bottom', size='5%', pad=0.1)
+        cax = divider.append_axes("bottom", size="5%", pad=0.1)
         gt_color_legend(state, comms=comms, ax=cax, norm=norm)
 
     return out
@@ -259,13 +279,12 @@ def comm_sizes(*states, labels=None, ax=None, width=0.8, alpha=0.4):
     for state in states:
         u, cs = np.unique(state.b.a, return_counts=True)
         idx = np.argsort(cs)[::-1]
-        ax.bar(u, cs[idx], align='center', width=width, alpha=alpha)
+        ax.bar(u, cs[idx], align="center", width=width, alpha=alpha)
 
-    ax.set_label('Community')
-    ax.set_ylabel('Nb of nodes')
+    ax.set_label("Community")
+    ax.set_ylabel("Nb of nodes")
 
     if labels:
         ax.legend(labels)
 
     return out
-

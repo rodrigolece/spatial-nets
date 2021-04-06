@@ -11,54 +11,69 @@ from spatial_nets import utils
 
 
 def main(output_dir):
-    parser = argparse.ArgumentParser(description='Parse input files')
-    parser.add_argument('flow_file', help='The name of the file containing flows')
-    parser.add_argument('dmat_file', help='The file constaining the distance matrix')
+    parser = argparse.ArgumentParser(description="Parse input files")
+    parser.add_argument("flow_file", help="The name of the file containing flows")
+    parser.add_argument("dmat_file", help="The file constaining the distance matrix")
 
     # Optional arguments
-    parser.add_argument('-c', '--usecoords', action='store_true',
-                        help='use coords instead of distance matrix')
-    parser.add_argument('-f', '--fun', type=str, default='nonlinear',
-                        help='Param. calibration method')
-    parser.add_argument('-l', '--log', action='store_true',
-                        help='Call calibration method with option use_log=True')
-    parser.add_argument('-e', '--exact', action='store_true',
-                        help='Use exact calculation of p-values')
-    parser.add_argument('-s', '--significance', type=float, default=0.01,
-                        help='Significance threshold')
-    parser.add_argument('-o', '--output', default=None,
-                        help='Name of output file')
-    parser.add_argument('--latex', action='store_true', help='print latex tables')
+    parser.add_argument(
+        "-c",
+        "--usecoords",
+        action="store_true",
+        help="use coords instead of distance matrix",
+    )
+    parser.add_argument(
+        "-f", "--fun", type=str, default="nonlinear", help="Param. calibration method"
+    )
+    parser.add_argument(
+        "-l",
+        "--log",
+        action="store_true",
+        help="Call calibration method with option use_log=True",
+    )
+    parser.add_argument(
+        "-e", "--exact", action="store_true", help="Use exact calculation of p-values"
+    )
+    parser.add_argument(
+        "-s", "--significance", type=float, default=0.01, help="Significance threshold"
+    )
+    parser.add_argument("-o", "--output", default=None, help="Name of output file")
+    parser.add_argument("--latex", action="store_true", help="print latex tables")
 
     # Parse arguments
     args = parser.parse_args()
     flow_file = args.flow_file
     dmat_file = args.dmat_file
     sig = args.significance
-    fmt = 'latex' if args.latex else 'simple'
+    fmt = "latex" if args.latex else "simple"
 
     if args.output:
         output_file = output_dir / args.output
         base, ext = os.path.splitext(output_file)
-        if ext != '.npz':
+        if ext != ".npz":
             print("Changing output extension to '.npz'")
-            output_file = Path(base + '.npz')
+            output_file = Path(base + ".npz")
 
-    assert args.fun in ('nonlinear', 'cpc', 'all'), f'invalid calibration method {args.fun}'
-    assert sig > 0, 'significance should be positive'
+    assert args.fun in (
+        "nonlinear",
+        "cpc",
+        "all",
+    ), f"invalid calibration method {args.fun}"
+    assert sig > 0, "significance should be positive"
 
     # We read the flows to parse the filename
     print(f"\nReading flows from '{os.path.basename(flow_file)}'")
     T_data = utils.load_flows(flow_file, zero_diag=True)
 
     nb_locations, nb_pairwise_flows = T_data.shape[0], T_data.nnz
-    print(f'Nb of locations loaded: {nb_locations}')
-    print(f'Effective density of flow data: {nb_pairwise_flows / nb_locations**2:.3f}')
+    print(f"Nb of locations loaded: {nb_locations}")
+    print(f"Effective density of flow data: {nb_pairwise_flows / nb_locations**2:.3f}")
 
     # Read the dmat file or the coordinates
     if args.usecoords:
-        assert (ext := os.path.splitext(dmat_file)[1]) == '.npy', \
-                f"unsupported extension {ext}; use '.npy'"
+        assert (
+            ext := os.path.splitext(dmat_file)[1]
+        ) == ".npy", f"unsupported extension {ext}; use '.npy'"
         print(f"\nReading coordinates from '{os.path.basename(dmat_file)}'")
         dmat = np.load(dmat_file)
     else:
@@ -69,43 +84,42 @@ def main(output_dir):
 
     if args.log:
         kwargs = dict(use_log=True)
-        print('\nUsing log-loss function')
+        print("\nUsing log-loss function")
     else:
         kwargs = {}
 
     locs = Locations.from_data(dmat, T_data)
-    method = getattr(locs, f'gravity_calibrate_{args.fun}')
-
+    method = getattr(locs, f"gravity_calibrate_{args.fun}")
 
     # Start the calculations proper
 
     # Gravity: unconstrained
-    ct = 'unconstrained'
+    ct = "unconstrained"
     c, a, b = method(constraint_type=ct, **kwargs)
     fmat = locs.gravity_matrix(c, α=a, β=b)
     T_unc = locs.constrained_model(fmat, ct)
 
     # Gravity: production
-    ct = 'production'
+    ct = "production"
     c, *other, b = method(constraint_type=ct, **kwargs)
     fmat = locs.gravity_matrix(c, α=0, β=b)
     T_prod = locs.constrained_model(fmat, ct)
     pmat_prod = locs.probability_matrix(T_prod, ct)
 
     # Gravity: attraction
-    ct = 'attraction'
+    ct = "attraction"
     c, a, *other = method(constraint_type=ct, **kwargs)
     fmat = locs.gravity_matrix(c, α=a, β=0)
     T_attrac = locs.constrained_model(fmat, ct)
     pmat_attrac = locs.probability_matrix(fmat, ct)
 
     # Gravity: doubly
-    ct = 'doubly'
+    ct = "doubly"
     c, *other = method(constraint_type=ct, **kwargs)
     fmat = locs.gravity_matrix(c, α=0, β=0)
     T_doubly = locs.constrained_model(fmat, ct)
-    pmat_doubly_prod = locs.probability_matrix(T_doubly, 'production')
-    pmat_doubly_attrac = locs.probability_matrix(T_doubly, 'attraction')
+    pmat_doubly_prod = locs.probability_matrix(T_doubly, "production")
+    pmat_doubly_attrac = locs.probability_matrix(T_doubly, "attraction")
 
     models = [T_unc, T_prod, T_attrac, T_doubly]
 
@@ -115,18 +129,18 @@ def main(output_dir):
     r2 = [metrics.r2_score(T_data.toarray(), model) for model in models]
     results = np.array([cpc, cpl, rms, r2])
 
-    rows = ['CPC', 'CPL', 'SRMSE', 'R2']
-    cols = ['', 'Grav. Unc.', 'Grav. Prod.', 'Grav. Attr.', 'Grav. Doubly']
+    rows = ["CPC", "CPL", "SRMSE", "R2"]
+    cols = ["", "Grav. Unc.", "Grav. Prod.", "Grav. Attr.", "Grav. Doubly"]
     tab = [[rows[i]] + results[i].tolist() for i in range(len(rows))]
 
     print()
-    print(tabulate(tab, headers=cols, floatfmt='.3f', tablefmt=fmt))
+    print(tabulate(tab, headers=cols, floatfmt=".3f", tablefmt=fmt))
     print()
 
     # Calculate the number of significant edges
     models = [pmat_prod, pmat_attrac, pmat_doubly_prod, pmat_doubly_attrac]
-    names = ['gravity', 'gravity', 'grav-doubly-p', 'grav-doubly-a']
-    types = ['production', 'attraction', 'production', 'attraction']
+    names = ["gravity", "gravity", "grav-doubly-p", "grav-doubly-a"]
+    types = ["production", "attraction", "production", "attraction"]
 
     exact_mat = np.zeros((4, len(models)))
     approx_mat = np.zeros((4, len(models)))
@@ -143,7 +157,7 @@ def main(output_dir):
             nplus, nminus = np.sum(exact_plus), np.sum(exact_minus)
             exact_mat[:, k] = [nplus, nminus, n - nplus - nminus, n]
 
-            name = f'{names[k]}_{constr}_exact'
+            name = f"{names[k]}_{constr}_exact"
             save_dict[name] = pvals.copy()  # copy maybe not needed
 
         pvals = locs.pvalues_approx(pmat, constraint_type=constr)
@@ -158,29 +172,31 @@ def main(output_dir):
         # name = f'{names[k]}_{constr}_approx'
         # save_dict[name] = pvals.copy()  # copy maybe not needed
 
-    rows = ['Positive (observed larger)', 'Negative (model larger)',
-            'Not-significant', 'Total']
-    cols = ['', 'Grav. Prod.', 'Grav. Attr.', 'Grav. Dp', 'Grav. Da']
+    rows = [
+        "Positive (observed larger)",
+        "Negative (model larger)",
+        "Not-significant",
+        "Total",
+    ]
+    cols = ["", "Grav. Prod.", "Grav. Attr.", "Grav. Dp", "Grav. Da"]
 
     if args.exact:
-        print('\nExact p-value')
+        print("\nExact p-value")
         tab = [[rows[k]] + exact_mat[k].tolist() for k in range(len(rows))]
         print(tabulate(tab, headers=cols, tablefmt=fmt))
 
-    print('\nNormal approximation')
+    print("\nNormal approximation")
     tab = [[rows[k]] + approx_mat[k].tolist() for k in range(len(rows))]
     print(tabulate(tab, headers=cols, tablefmt=fmt))
 
-
     # Save to file
     if args.output:
-        print(f'\nWriting p-values to: {output_file}')
+        print(f"\nWriting p-values to: {output_file}")
         np.savez(output_file, **save_dict)
 
 
-if __name__ == '__main__':
-    output_dir = Path('output')
+if __name__ == "__main__":
+    output_dir = Path("output")
     main(output_dir)
 
-    print('\nDone!\n')
-
+    print("\nDone!\n")
