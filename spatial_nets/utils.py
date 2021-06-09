@@ -29,28 +29,14 @@ def _get_iterable(x):
         return (x,)
 
 
-def build_graph(mat, idx=None, directed=True, coords=None, vertex_properties={}):
+def build_graph(mat, directed=True, coords=None, vertex_properties={}):
     """Build a Graph from a given mat and a subset of the nonzero entries."""
-    nb_nodes, _ = mat.shape
-
-    i, j = mat.nonzero()
-    # TODO: could reuse i,j and avoid the else clause
-    if idx is not None:
-        ii, jj = i[idx], j[idx]
-    else:
-        ii, jj = i, j
-    if not directed:
-        pos = ii < jj
-        ii, jj = ii[pos], jj[pos]
-
-    nb_edges = len(ii)
-
-    data = np.ones(nb_edges, dtype=int)
-    A = sp.csr_matrix((data, (ii, jj)), shape=mat.shape)
+    nb_nodes, m = mat.shape
+    assert nb_nodes == m, "input matrix should be square"
 
     G = gt.Graph(directed=directed)
     G.add_vertex(nb_nodes)
-    G.add_edge_list(np.transpose(A.nonzero()))
+    G.add_edge_list(np.transpose(mat.nonzero()))
 
     if coords is not None:
         pos = G.new_vertex_property("vector<double>")
@@ -76,10 +62,16 @@ def build_graph(mat, idx=None, directed=True, coords=None, vertex_properties={})
 
 
 def build_significant_graph(
-    locs, model, sign="plus", coords=None, significance=0.01, verbose=False
+    locs,
+    model,
+    sign="plus",
+    exact_pvalues=True,
+    coords=None,
+    significance=0.01,
+    verbose=False,
 ):
 
-    assert sign in ("plus", "minus"), "Invalid sign"
+    assert sign in ("plus", "minus", "weight_covariates"), "Invalid sign"
 
     family, ct = model.split("-")
 
@@ -108,11 +100,27 @@ def build_significant_graph(
     T_model = locs.constrained_model(fmat, ct, verbose=verbose)
     pmat = locs.probability_matrix(T_model, pvalue_ct)
 
-    pvals = locs.pvalues_exact(pmat, constraint_type=pvalue_ct)
-    pvals = pvals[:, 0] if sign == "plus" else pvals[:, 1]
-    idx = pvals < significance
+    sig_plus, sig_minus = locs.significant_edges(
+        pmat,
+        constraint_type=pvalue_ct,
+        significance=significance,
+        exact=exact_pvalues,
+        verbose=verbose,
+    )
 
-    out = build_graph(locs.data, idx, coords=coords, directed=True)
+    if sign in ("plus", "minus"):
+        sig = sig_plus if sign == "plus" else sig_minus
+        out = build_graph(sig, coords=coords, directed=True)
+    elif sign == "weight_covariates":
+        out = build_graph(sig_plus, coords=coords, directed=True)
+        out.add_edge_list(np.transpose(sig_minus.nonzero()))
+        weights = np.concatenate(
+            (
+                np.ones(sig_plus.nnz, dtype=int),
+                np.zeros(sig_minus.nnz, dtype=int),
+            )
+        )
+        out.ep["weight"] = out.new_edge_property("short", vals=weights)
 
     return out
 

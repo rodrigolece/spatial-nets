@@ -14,8 +14,8 @@ class Experiment(object):
         rho: float,
         params: Dict,
         model: str,
-        benchmark: str = "expert",
-        sign: str = "plus",
+        benchmark: str,
+        sign: str,
         significance: float = 0.01,
         directed: bool = False,
         verbose: bool = False,
@@ -24,7 +24,9 @@ class Experiment(object):
         assert model.startswith(("gravity", "radiation"))
         assert model.endswith(("production", "attraction", "doubly"))
         assert benchmark in (("expert", "cerina")), f"invalid benchmark: {benchmark}"
-        assert sign in (("plus", "minus"))
+        assert sign in (("plus", "minus", "weight_covariates"))
+        if sign == "weight_covariates":
+            raise NotImplementedError
 
         self.N = N
         self.rho = rho

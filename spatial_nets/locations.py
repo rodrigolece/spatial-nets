@@ -738,7 +738,9 @@ class Locations(object):
     #     return CPC(Data, self.constrained_model(model, constraint_type, params))
     #
 
-    def pvalues_approx(self, pmat: Array, constraint_type: str) -> Array:
+    def pvalues_approx(
+        self, pmat: Array, constraint_type: str
+    ) -> Tuple[sparse.csr_matrix, sparse.csr_matrix]:
         """
         Calculate the p-values using the normal approximation.
 
@@ -749,12 +751,11 @@ class Locations(object):
 
         Returns
         -------
-        Array
-            A Mx2 array where M is the number of nonzero-edges. The first column
-            stores the p-values for the hypothesis "the observation is not
-            signifcantly larger than the predicted mean" and the second column
-            for the hypothesis "the observation is not signifcantly smaller than
-            the predicted mean."
+        Tuple[csr_matrix, csr_matrix]
+            The first matrix stores the p-values for the hypothesis
+            "the observation is not signifcantly larger than the predicted mean"
+            and the second matrix for the hypothesis "the observation is not
+            signifcantly smaller than the predicted mean."
 
         """
         if self.data is None:
@@ -765,25 +766,29 @@ class Locations(object):
             "attraction",
         ], f"invalid constraint {constraint_type}"
 
-        ii, jj = self.data.nonzero()
-
         # Entry-wise first and second moments (binomial model)
-        Data = self.data
         if constraint_type == "production":
             Exp = self.data_out[:, np.newaxis] * pmat
         elif constraint_type == "attraction":
             Exp = pmat * self.data_in[np.newaxis, :]
         Std = np.sqrt(Exp * (1 - pmat))
 
-        Z_score = (Data[ii, jj] - Exp[ii, jj]) / Std[ii, jj]
+        i, j = self.data.nonzero()
+        shp = self.data.shape
+        Z_score = (self.data[i, j] - Exp[i, j]) / Std[i, j]
         Z_score = np.asarray(Z_score).flatten()
 
-        plus = stats.norm.cdf(-Z_score)
-        minus = stats.norm.cdf(Z_score)
+        data_plus = stats.norm.cdf(-Z_score)
+        data_minus = stats.norm.cdf(Z_score)
 
-        return np.vstack((plus, minus)).T
+        plus = sparse.csr_matrix((data_plus, (i, j)), shape=shp)
+        minus = sparse.csr_matrix((data_minus, (i, j)), shape=shp)
 
-    def pvalues_exact(self, pmat: Array, constraint_type: str) -> Array:
+        return (plus, minus)
+
+    def pvalues_exact(
+        self, pmat: Array, constraint_type: str
+    ) -> Tuple[sparse.csr_matrix, sparse.csr_matrix]:
         """
         Calculate the p-values using the exact binomial distributions.
 
@@ -794,12 +799,11 @@ class Locations(object):
 
         Returns
         -------
-        Array
-            A Mx2 array where M is the number of nonzero-edges. The first column
-            stores the p-values for the hypothesis "the observation is not
-            signifcantly larger than the predicted mean" and the second column
-            for the hypothesis "the observation is not signifcantly smaller than
-            the predicted mean."
+        Tuple[csr_matrix, csr_matrix]
+            The first matrix stores the p-values for the hypothesis
+            "the observation is not signifcantly larger than the predicted mean"
+            and the second matrix for the hypothesis "the observation is not
+            signifcantly smaller than the predicted mean."
 
         """
         if self.data is None:
@@ -811,8 +815,9 @@ class Locations(object):
         ], f"invalid constraint {constraint_type}"
 
         ii, jj = self.data.nonzero()
+        shp = self.data.shape
         n = len(ii)
-        out = np.zeros((n, 2))
+        data_plus, data_minus = np.zeros(n), np.zeros(n)
 
         # The target N is either the row or the column sum
         Ns = self.data_out[ii] if constraint_type == "production" else self.data_in[jj]
@@ -820,10 +825,13 @@ class Locations(object):
         for k in range(n):
             i, j = ii[k], jj[k]
             x, n, p = self.data[i, j], Ns[k], pmat[i, j]
-            out[k, 0] = stats.binom_test(x, n=n, p=p, alternative="greater")
-            out[k, 1] = stats.binom_test(x, n=n, p=p, alternative="less")
+            data_plus[k] = stats.binom_test(x, n=n, p=p, alternative="greater")
+            data_minus[k] = stats.binom_test(x, n=n, p=p, alternative="less")
 
-        return out
+        plus = sparse.csr_matrix((data_plus, (ii, jj)), shape=shp)
+        minus = sparse.csr_matrix((data_minus, (ii, jj)), shape=shp)
+
+        return (plus, minus)
 
     def significant_edges(
         self,
@@ -832,7 +840,7 @@ class Locations(object):
         significance: float = 0.01,
         exact: bool = False,
         verbose: bool = False,
-    ) -> Tuple[Array, Array]:
+    ) -> Tuple[sparse.csr_matrix, sparse.csr_matrix]:
         """
         Calculate the significant edges according to a binomial test (or z-test).
 
@@ -849,19 +857,20 @@ class Locations(object):
 
         Returns
         -------
-        edges
+        Tuple[csr_matrix, csr_matrix]
 
         """
         method_name = "pvalues_" + ("exact" if exact else "approx")
         method = getattr(self, method_name)
-        pvals = method(pmat, constraint_type)
+        plus, minus = method(pmat, constraint_type)
+        mask = self.data.astype(bool)
 
-        significant = pvals < significance
-        idx_plus = significant[:, 0]
-        idx_minus = significant[:, 1]
+        sig_plus = (plus < significance).multiply(mask)
+        # needed for elementwise multiplication because sparse is matrix type
+        sig_minus = (minus < significance).multiply(mask)
 
         if verbose:
-            n, nplus, nminus = len(pvals), np.sum(idx_plus), np.sum(idx_minus)
+            n, nplus, nminus = mask.nnz, sig_plus.nnz, sig_minus.nnz
             nzero = n - nplus - nminus
             tab = [
                 ["Positive (observed larger)", nplus, f"{100*nplus/n:.2f}"],
@@ -871,7 +880,7 @@ class Locations(object):
             ]
             print(tabulate(tab, headers=["", "Nb", "%"]))
 
-        return idx_plus, idx_minus
+        return sig_plus, sig_minus
 
 
 # Outside the classes
