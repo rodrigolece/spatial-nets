@@ -1,10 +1,10 @@
-__pycache__/
-*.egg-info
 *.pyc
 *.pkl
 *.log
 
+spatial_nets.egg-info
+
 notebooks/
 test/
 output/
-validation/output*
+validation/output/*

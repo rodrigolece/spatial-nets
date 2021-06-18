@@ -1,1012 +1,298 @@
-import warnings
+#  import warnings
 import pickle
-import numpy as np
-import numpy.ma as ma
-from scipy import stats, sparse, optimize
-from sklearn import linear_model
-from sklearn.metrics import pairwise
 import textwrap
-from tabulate import tabulate
-from typing import Dict, Tuple, Optional
+from typing import Dict, Optional
 
-from . import utils
+import numpy as np
+import scipy.sparse as sp
+from sklearn.metrics import pairwise
 
-Array = np.array
+import graph_tool as gt
+
+import spatial_nets.utils as utils
+
+Array = np.ndarray
 OptionalFloat = Optional[float]
 ParamDict = Dict[str, OptionalFloat]
 
 
-# __all__ = ['Locations', 'binomial_pvalues', 'CPC', 'CPL']
+# __all__ = ["Locations", "CPC", "CPL", "RMSE"]
 
 
-class Locations(object):
+class LocationsDataClass:
     """
-    Locations in 2D space with relevance and community attributes.
+    Locations in 2D space with relative strengths and community attributes.
 
-    The model represents nodes of a network embedded in 2D space, and provides
-    methods for calculating human mobility models. The relevance attribute
-    captures for example the population at each location (or some other measure
-    of intrinsic strenght). The community attribute is currently optional but
-    the model will be extended to make full use of it.
+    % The model represents nodes of a network embedded in 2D space, and provides
+    methods for calculating human mobility models.
+    The production and attraction attributes measure the relative importance at
+    each location (e.g. strenght, population, etc.).
+
+    The community attribute ... TODO
 
     Attributes
     ----------
-    TODO: Update below
     N : int
-        Number of nodes.
-    dmat : np.array
-        The matrix of pariwise distances between locations.
-    relevance : np.array
-        A measure of the relevance or intrinsic strength of the locations.
-    in_relevance : np.array
-        A second measure of the relevance (to be used as the in-attraction
-        whereas relevance is the out-attraction).
-    k : int
-        The number of communities.
-    comm : np.array
-        The community of the nodes.
-    data: np.array or None
-        NxN matrix that hold data observations.
+        The number of locations.
+    dmat : np.ndarray
+        The NxN matrix of pairwise distances between locations.
+    production : np.ndarray
+        The vector containing a measure of outgoing strenght at each location.
+    attraction : np.ndarray
+        The vector containing a measure of incoming strength at each location.
+
+    TODO
+    comm_vec : np.ndarray or None, optional
+        A vector containing the community (block) assignment of each location
+        (default is None). The community methods will be extended in the
+        future.
 
     """
 
-    def __init__(
-        self,
-        N: int,
-        location_mat: Array,
-        orig_relvec: Array,
-        dest_relvec: Array = None,
-        comm_vec: Array = None,
-        use_coords: bool = False,
-    ) -> None:
+    def __init__(self, data=None, coords=None, **kwargs):
         """
-        Instantiate the Locations object.
+        Initialise the LocationsDataClass object.
 
         Parameters
         ----------
-        N : int
-            The number of locations.
-        location_mat : array_like
-            The NxN matrix of pairwise distances between locations.
-            Alternatively, if `use_coords` is set to True this should be the Nx2
-            array of coordinates.
-        orig_relvec : array_like
-            The primary relevance vector of each location (for example the
-            population). If `dest_relvec` is also provided then this vector is
-            taken to be the origin relevance.
-        dest_relvec : array_like or None, optional
-            Provided to distintiguish two sets of intrinsic measures of relevance
-            for each location (default is None). If provided, this vector represents
-            the destination relevance while `orig_relvec` is origin relevance.
-        comm_vec : array_like or None, optional
-            A vector containing the community (block) assignment of each location
-            (default is None). The community methods will be extended in the
-            future.
-        use_coords : bool, optional
-            If set to True, `location_mat` should correspond to the Nx2 array of
-            coordinates and the class uses the pairwise euclidean distance
-            between locations.
+        data : object to be converted
+
+            Current supported types are:
+              a matrix containing OD data
+              a tuple containing the production and attraction vectors
+              a Graph object
+
+            To be implemented:
+              a dict  containing the production and attraction vectors
+              a DataFrame containing OD data
+              another LocationsDataClass object
+
+        coords : array_like, optional
+
 
         """
-        assert len(orig_relvec) == N, "vec should have length N"
+        self.N: int = None
+        self.B: int = None
 
-        shp = location_mat.shape
-        if use_coords:
-            assert shp == (N, 2), "expected size Nx2 (`use_coords=True` was passed)"
-            self.dmat = pairwise.euclidean_distances(location_mat)
+        self._dmat: np.ndarray = None
+        self._production: np.ndarray = None
+        self._attraction: np.ndarray = None
+
+        self._flow_data: sp.csr_matrix = None  # TODO: what about other possibilities?
+        self.target_rows: np.ndarray = None
+        self.target_cols: np.ndarray = None
+
+        #  self._model_params = None
+        #  self._affinity_mat: np.ndarray = None
+        #  self._balancing_factors: Tuple[np.ndarray, np.ndarray] = None
+        #  self._pvalues: Tuple[sp.csr_matrix, sp.csr_matrix] = None
+        #  self._significance: float = None
+
+        if isinstance(data, (np.integer, int)):
+            if data < 1:
+                raise ValueError("invalid nunmber of locations")
+            self.N = data
+
+        # For LocationsDataClass or Graph, we can assume the coords are stored
+        # inside the object
+
+        elif isinstance(data, LocationsDataClass):
+            # TODO: self.copy()
+            #  return data.copy()
+            pass
+
+        elif isinstance(data, (gt.Graph, gt.GraphView)):
+            if (flow := data.ep.get("flow")) is not None:
+                self.flow_data = gt.spectral.adjacency(data, weight=flow)
+            else:
+                raise ValueError("valid inpud needs a `flow` edge property")
+
+            if (pos := data.vp.get("pos")) is not None:
+                self.dmat = np.array(list(pos)) * [
+                    [1],
+                    [-1],
+                ]  # due to cairo's coordinate system in the y-direction
+            #  elif coords is not None:
+            #      self.dmat = coords
+            #  TODO: This should be covered by the elif below
+
+        # In any other case, the coordinates should be passed (the coords
+        #  argument takes precedence)
+
+        elif coords is not None:
+
+            if isinstance(data, tuple):
+                assert len(data) == 2, "two sets of features are needed"
+                prod, attrac = data
+                self.production = prod
+                self.attraction = attrac
+
+            elif isinstance(data, (np.matrix, np.ndarray)):
+                # TODO: test that this does not catch sparse matrix
+                self.flow_data = data
+            elif sp.issparse(data):
+                self.flow_data = data
+
+            self.dmat = coords
+            # TODO: this should work for Graph object with no `pos` vp
 
         else:
-            assert shp == (N, N), "expected size NxN"
-            assert not np.any(location_mat < 0), "matrix should be non_negative"
-            self.dmat = location_mat
+            raise ValueError("coordinate matrix is needed")
 
-        self.N = N
-        self.orig_rel = np.array(orig_relvec)  # prefer arr to list or Series
-        self._data = None
-        # self._datasparseflag = False  # Currently not used
+        # TODO: is this good idea?
+        for key, val in kwargs.items():
+            setattr(self, key, val)
 
-        assert np.all(self.orig_rel > 0), "vec should have positive entries"
-
-        if dest_relvec is None:
-            self.dest_rel = self.orig_rel  # binding to avoid duplicate data
-            self._tworelevancesflag = False
-        else:
-            assert len(dest_relvec) == N, "vec should have length N"
-            self.dest_rel = np.array(dest_relvec)  # prefer arr
-            self._tworelevancesflag = True
-            assert np.all(self.dest_rel > 0), "vec should have positive etries"
-
-        if comm_vec is None:
-            self.k = 1
-            self.comm = np.ones(N, dtype=int)
-        else:
-            # self.k = len(np.unique(comm_vec))  #TODO:check below works better
-            self.k = len(set(comm_vec))
-            self.comm = np.array(comm_vec)
-
-        return None
+        # TODO
+        #  if comm_vec is None:
+        #      self.B = 1
+        #      self.comm = np.ones(N, dtype=int)
+        #  else:
+        #      # self.k = len(np.unique(comm_vec))  #TODO:check below works better
+        #      self.B = len(set(comm_vec))
+        #      self.comm = np.array(comm_vec)
 
     def __str__(self) -> str:
-        if self._tworelevancesflag:
-            s = f"""
-                Locations object (orig. and dest. relevance provided):
-                    N={self.N} and k={self.k}
-                """
-        else:
-            s = f"Locations object: N={self.N} and k={self.k}"
+        s = f"Locations object: N={self.N}"
 
-        if self.data is not None:
-            s = s + "\n -- Data has been set"
+        if self.B is not None:
+            s += f" and B={self.B}"
+
+        if self.flow_data is not None:
+            s += "\n -- Data has been set"
 
         return textwrap.dedent(s)
 
-    @classmethod
-    def from_data(cls, location_mat, data_mat):
-        N, _ = data_mat.shape
-        assert (data_mat < 0).sum() == 0, f"data matrix should be non-negative"
-        assert data_mat.shape == (N, N), "data_mat is not NxN"
+    def __len__(self) -> int:
+        """Returns the number of locations.
 
-        # NB: We remove the diagonal from the data matrix BEFORE calculating
-        # outflow and inflow
-        if sparse.issparse(data_mat):
-            input_mat = utils.sparsemat_remove_diag(data_mat)  # creates a copy
-        else:
-            input_mat = data_mat.copy()
-            input_mat[np.diag_indices(N)] = 0
+        Returns
+        -------
+        N : int
+            The number of locations.
 
-        # Row and column sums for dense and sparse matrices
-        outflow = np.asarray(input_mat.sum(axis=1)).flatten()
-        inflow = np.asarray(input_mat.sum(axis=0)).flatten()
+        """
+        return self.N
 
-        coords = True if location_mat.shape == (N, 2) else False
-
-        locs = cls(N, location_mat, outflow, inflow, use_coords=coords)
-        locs.data = data_mat
-
-        return locs
+    def copy(self):
+        # TODO
+        pass
 
     @property
-    def data(self):
-        """Retrieve the data stored inside the object."""
-        return self._data
+    def dmat(self):
+        return self._dmat
 
-    @data.setter
-    def data(self, data_mat: Array):
+    @dmat.setter
+    def dmat(self, location_mat) -> np.ndarray:
+        N, m = location_mat.shape
+
+        if (m != N) and (m != 2):
+            raise ValueError("invalid shape for coordinate matrix")
+
+        if self.N is not None:
+            if N != self.N:
+                raise ValueError("input has invalid length")
+        else:
+            self.N = N
+
+        # The location mat has the right shape; now do other tests
+        if m == 2:
+            self._dmat = pairwise.euclidean_distances(location_mat)
+
+        elif np.any(location_mat < 0):
+            raise ValueError("matrix should be non_negative")
+        else:  # valid NxN matrix
+            self._dmat = location_mat
+
+    @property
+    def production(self):
+        return self._production
+
+    @production.setter
+    def production(self, prod: Array):
+        """Should be set first."""
+        prod = np.array(prod)
+        N = len(prod)
+
+        if not np.all(prod > 0):
+            raise ValueError("input should have strictly positive entries")
+
+        if self.N is not None:
+            if N != self.N:
+                raise ValueError("input has invalid length")
+        else:
+            self.N = N
+
+        self._production = prod
+
+    @property
+    def attraction(self):
+        return self._attraction
+
+    @attraction.setter
+    def attraction(self, attrac: Array):
+        """Should be set second."""
+        attrac = np.array(attrac)
+
+        if not np.all(attrac > 0):
+            raise ValueError("input should have strictly positive entries")
+        if len(attrac) != self.N:
+            raise ValueError("input has invalid length")
+
+        self._attraction = attrac
+
+    @property
+    def flow_data(self):
+        """Retrieve the data stored inside the object."""
+        return self._flow_data
+
+    @flow_data.setter
+    def flow_data(self, flow_mat: Array):
         """Set a copy of the data inside the object."""
-        assert (data_mat < 0).sum() == 0, f"data matrix should be non-negative"
-        # Test above works for dense and sparse matrices
-        assert data_mat.shape == (self.N, self.N), "data_mat is not NxN"
+        N, m = flow_mat.shape
+
+        if (flow_mat < 0).sum() > 0:  # works for dense and spase matrices
+            raise ValueError("data matrix should be non-negative")
+
+        if m != N:
+            raise ValueError("invalid shape for matrix")
+
+        if self.N is not None:
+            if N != self.N:
+                raise ValueError("input has invalid shape")
+
+        else:
+            self.N = N
 
         # NB: We remove the diagonal from the data matrix BEFORE calculating
-        # outflow and inflow
-        if sparse.issparse(data_mat):
-            # self._datasparseflag = True
-            self._data = utils.sparsemat_remove_diag(data_mat)  # creates a copy
+        # the row and column sums
+        if sp.issparse(flow_mat):
+            self._flow_data = utils.sparsemat_remove_diag(flow_mat)  # creates a copy
         else:
-            self._data = data_mat.copy()
-            self._data[np.diag_indices(self.N)] = 0
+            self._flow_data = flow_mat.copy()
+            self._flow_data[np.diag_indices(self.N)] = 0
 
         # Row and column sums for dense and sparse matrices
-        outflow = np.asarray(self._data.sum(axis=1)).flatten()
-        inflow = np.asarray(self._data.sum(axis=0)).flatten()
+        self.production = np.asarray(self._flow_data.sum(axis=1)).flatten()
+        self.attraction = np.asarray(self._flow_data.sum(axis=0)).flatten()
 
-        self.data_out = outflow
-        self.data_in = inflow
+        self.target_rows = self.production
+        self.target_cols = self.attraction
 
         return None
 
-    def io_matrix(self, threshold: float = np.inf, **kwargs) -> Array:
-        """
-        Calculate intervening opportunities matrix summing the dest. relevance.
-
-        Parameters
-        ----------
-        threshold : float, optional
-            Maximum radius to count locations as intervening opportunities
-            (the default is np.inf).
-
-        Returns
-        -------
-        np.array
-            NxN intervening opportunities matrix.
-
-        """
-        S = np.zeros((self.N, self.N), dtype=self.dest_rel.dtype.type)
-
-        # We use masked arrays
-        masked_dmat = ma.masked_greater_equal(self.dmat, threshold)
-        idx_mat = ma.argsort(masked_dmat, axis=1)
-        # sort each row; masked elements are ignored but sorted last
-
-        masked_rel = ma.masked_array(self.dest_rel)
-
-        for i, idx in enumerate(idx_mat):
-            masked_rel.mask = masked_dmat[i].mask
-            masked_rel[i] = ma.masked  # origin is not used
-            masked_rel[idx[-1]] = ma.masked  # the furthest point is not used
-
-            rolled_idx = np.roll(idx, 1)
-            S[i, idx] = masked_rel[rolled_idx].cumsum()
-
-        return S
-
-    def radiation_matrix(
-        self,
-        threshold: float = np.inf,
-        finite_correction: bool = True,
-        **kwargs,
-    ) -> Array:
-        """
-        Calculate the radiation matrix.
-
-        Parameters
-        ----------
-        threshold : float, optional
-            Maximum radius to count locations as intervening opportunities
-            (the default is np.inf).
-        finite_correction :
-            Wether to normalise each row using the term $1/(1 - m_i / M)$.
-
-        Returns
-        -------
-        np.array
-            NxN unconstrained radiation matrix.
-
-        """
-        S = self.io_matrix(threshold=threshold)
-        # m = self.orig_rel[:, np.newaxis]  # column vector
-        m = self.dest_rel[:, np.newaxis]  # column vector
-        n = self.dest_rel[:, np.newaxis]  # column vector
-
-        num = m * n.T
-        den = (m + S) * (m + n.T + S)
-        with np.errstate(invalid="ignore"):
-            # 0/0 inside arrays is invalid floating point, not divide error;
-            # to cover the case m_i + S_ij = 0 (can occur when m_i is zero)
-            out = num / den
-            out[np.isnan(out)] = 0.0
-
-        out[np.diag_indices_from(out)] = 0.0
-
-        if finite_correction:
-            M = np.sum(m)
-            norm = 1 - m / M  # column vector
-            out = out / norm  # each row is scaled
-
-        return out
-
-    def gravity_matrix(
-        self, γ: float, α: float = 1.0, β: float = 1.0, **kwargs
-    ) -> Array:
-        """
-        Calculate the gravity matrix.
-
-        Parameters
-        ----------
-        γ : float
-            Decay exponent.
-        α, β : float, optional
-            Respetively the power of the origin and destination terms.
-
-        Returns
-        -------
-        np.array
-            NxN unconstrained gravity matrix.
-
-        """
-        m = self.orig_rel[:, np.newaxis]  # column vector
-        n = self.dest_rel[:, np.newaxis]  # column vector
-
-        with np.errstate(divide="ignore", invalid="raise"):
-            # 0**(-γ) raises divide error, 0 * ∞ raises invalid error in multiply
-            dmat_power = self.dmat ** (-γ)
-            dmat_power[np.diag_indices(self.N)] = 0.0
-            # note this doesn't fix problems outside diagonal, this is on purpose
-
-            out = (m ** α) * (n.T ** β) * dmat_power
-
-        return out
-
-    def gravity_calibrate_nonlinear(
-        self,
-        constraint_type: str,
-        maxiters=500,
-        use_log=False,
-        verbose: bool = False,
-    ) -> Tuple[float, float]:
-        """
-        Calibrate the gravity model using nonlinear least squares.
-
-        Parameters
-        ----------
-        constraint_type : str
-
-        Returns
-        -------
-        float, float
-
-        """
-        if self.data is None:
-            raise DataNotSet("the data for comparison is needed")
-
-        assert constraint_type in [
-            "unconstrained",
-            "production",
-            "attraction",
-            "doubly",
-        ], f"invalid constraint {constraint_type}"
-
-        # The observations
-        i, j = self.data.nonzero()
-        y = np.asarray(self.data[i, j]).flatten()
-
-        if constraint_type == "unconstrained":
-            x0 = [2, 1, 1]
-            bounds = ([-np.inf, 0, 0], [np.inf, np.inf, np.inf])
-
-            def cost_fun(x):  # gamma, alpha, beta
-                fmat = self.gravity_matrix(x[0], α=x[1], β=x[2])
-                K = self.data.sum() / fmat.sum()
-                T_model = K * fmat
-                if use_log:
-                    out = np.log(y) - np.log(T_model[i, j])
-                else:
-                    out = y - T_model[i, j]
-                return out
-
-        elif constraint_type == "production":
-            x0 = [1, 1]
-            bounds = ([-np.inf, 0], [np.inf, np.inf])
-
-            def cost_fun(x):  # gamma, beta
-                fmat = self.gravity_matrix(x[0], α=0, β=x[1])
-                pmat = self.probability_matrix(fmat, constraint_type)
-                T_model = self.data_out[:, np.newaxis] * pmat
-                if use_log:
-                    out = np.log(y) - np.log(T_model[i, j])
-                else:
-                    out = y - T_model[i, j]
-                return out
-
-        elif constraint_type == "attraction":
-            x0 = [1, 1]
-            bounds = ([-np.inf, 0], [np.inf, np.inf])
-
-            def cost_fun(x):  # gamma, alpha
-                fmat = self.gravity_matrix(x[0], α=x[1], β=0)
-                pmat = self.probability_matrix(fmat, constraint_type)
-                T_model = pmat * self.data_in[np.newaxis, :]
-                if use_log:
-                    out = np.log(y) - np.log(T_model[i, j])
-                else:
-                    out = y - T_model[i, j]
-                return out
-
-        elif constraint_type == "doubly":
-            x0 = [2]
-            bounds = (-np.inf, np.inf)
-
-            def cost_fun(x):  # gamma
-                fmat = self.gravity_matrix(x[0], α=0, β=0)
-                T_model = simple_ipf(
-                    fmat,
-                    self.data_out,
-                    self.data_in,
-                    maxiters=maxiters,
-                    verbose=verbose,
-                )
-                if use_log:
-                    out = np.log(y) - np.log(T_model[i, j])
-                else:
-                    out = y - T_model[i, j]
-                return out
-
-        res = optimize.least_squares(cost_fun, x0, bounds=bounds)
-        st = res.status
-        assert st > 0, f"optimization exit status is failure"
-
-        st_dict = {
-            -1: "improper input parameters status returned from MINPACK.",
-            0: "the maximum number of function evaluations is exceeded.",
-            1: "gtol termination condition is satisfied.",
-            2: "ftol termination condition is satisfied.",
-            3: "xtol termination condition is satisfied.",
-            4: "Both ftol and xtol termination conditions are satisfied.",
-        }
-
-        if verbose:
-            print("Status: ", st_dict[st])
-
-        return res.x
-
-    def gravity_calibrate_cpc(
-        self, constraint_type: str, maxiters=500, verbose: bool = False
-    ) -> Tuple[float, float]:
-        """
-        Calibrate the gravity model using CPC minisation
-
-        Parameters
-        ----------
-        constraint_type : str
-
-        Returns
-        -------
-        float, float
-
-        """
-        if self.data is None:
-            raise DataNotSet("the data for comparison is needed")
-
-        assert constraint_type in [
-            "unconstrained",
-            "production",
-            "attraction",
-            "doubly",
-        ], f"invalid constraint {constraint_type}"
-
-        if constraint_type == "unconstrained":
-            x0 = [2, 1, 1]
-            bounds = [(0, None)] * 3
-
-            def cost_fun(x):  # gamma, alpha, beta
-                fmat = self.gravity_matrix(x[0], α=x[1], β=x[2])
-                K = self.data.sum() / fmat.sum()
-                T_model = K * fmat
-                return 1 - CPC(T_model, self.data)
-
-        elif constraint_type == "production":
-            x0 = [1, 1]
-            bounds = [(0, None)] * 2
-
-            def cost_fun(x):  # gamma, beta
-                fmat = self.gravity_matrix(x[0], α=0, β=x[1])
-                pmat = self.probability_matrix(fmat, constraint_type)
-                T_model = self.data_out[:, np.newaxis] * pmat
-                return 1 - CPC(T_model, self.data)
-
-        elif constraint_type == "attraction":
-            x0 = [1, 1]
-            bounds = [(0, None)] * 2
-
-            def cost_fun(x):  # gamma, alpha
-                fmat = self.gravity_matrix(x[0], α=x[1], β=0)
-                pmat = self.probability_matrix(fmat, constraint_type)
-                T_model = pmat * self.data_in[np.newaxis, :]
-                return 1 - CPC(T_model, self.data)
-
-        elif constraint_type == "doubly":
-            x0 = [2]
-            bounds = [(0, None)]
-
-            def cost_fun(x):  # gamma
-                fmat = self.gravity_matrix(x[0], α=0, β=0)
-                T_model = simple_ipf(
-                    fmat,
-                    self.data_out,
-                    self.data_in,
-                    maxiters=maxiters,
-                    verbose=verbose,
-                )
-                return 1 - CPC(T_model, self.data)
-
-        res = optimize.minimize(cost_fun, x0, bounds=bounds)
-        # assert res.sucess, f'optimization exit status is failure'
-
-        if verbose:
-            print("Status: ", res.message)
-
-        return res.x
-
-    def gravity_calibrate_all(
-        self, verbose: bool = False, **kwargs
-    ) -> Tuple[float, float, float]:
-        """
-        Calibrate the all of the gravity parameters using linear least squares.
-
-        Parameters
-        ----------
-        verbose: bool, optional
-            The defalt is False
-
-        Returns
-        -------
-        γ, α, β : float
-
-        """
-        if self.data is None:
-            raise DataNotSet("the data for comparison is needed")
-
-        N = self.N
-
-        # The observations
-        i, j = self.data.nonzero()
-        y = np.asarray(self.data[i, j]).flatten()
-
-        # The model data
-        m = self.data_out[:, np.newaxis]  # col. vec.
-        n = self.data_in[np.newaxis, :]  # row vec.
-
-        m_repeated = np.repeat(m, N, axis=1)
-        n_repeated = np.repeat(n, N, axis=0)
-
-        X = np.vstack((m_repeated[i, j], n_repeated[i, j], self.dmat[i, j])).T
-        logX = np.log(X)
-
-        # if verbose:
-        #     ρ, _ = stats.pearsonr(logX[:, 0], logX[:, 1])
-        #     print(f'Correlation between log O and D columns, ρ : {ρ:.3f}\n')
-
-        reg = linear_model.LinearRegression()
-        reg.fit(logX, np.log(y))
-
-        α, β, γ = reg.coef_
-        γ = -γ
-        # k = np.exp(reg.intercept_)  # in practice works worse than unconstrained
-
-        if γ < 0.5:
-            warnings.warn(f"γ = {γ:.3f}")
-
-        return γ, α, β
-
-    def probability_matrix(self, f_mat: Array, constraint_type: str) -> Array:
-        """
-        Normalise the affinity matrix f_ij to get a probability.
-
-        Parameters
-        ----------
-        f_mat : array_like
-            A matrix that constains the flows predicted by one of the models.
-        constraint_type  : str
-            The type of constraint to use. Only 'production' or 'attraction'
-            make sense in this context.
-
-        Returns
-        -------
-        np.array
-            NxN normalised probability matrix with either rows or colums that
-            sum to one.
-
-        """
-        assert constraint_type in [
-            "production",
-            "attraction",
-        ], f"invalid constraint {constraint_type}"
-
-        assert not sparse.issparse(f_mat), "sparse matrices are not supported"
-
-        p_mat = f_mat.astype(float)  # to avoid problems with division
-
-        if constraint_type == "production":
-            # We assume that f_mat is NOT of type  sparse so that sums are flat
-            row_sum = f_mat.sum(axis=1)
-            idx = row_sum > 0
-            p_mat[idx] = p_mat[idx] / row_sum[idx, np.newaxis]
-
-        elif constraint_type == "attraction":
-            col_sum = f_mat.sum(axis=0)
-            idx = col_sum > 0
-            p_mat[:, idx] = p_mat[:, idx] / col_sum[np.newaxis, idx]
-
-        return p_mat
-
-    def draw_multinomial(self, p_mat, constraint_type, seed=0):
-        """Draw from the constrained model using multinomial distribution."""
-        assert constraint_type in [
-            "production",
-            "attraction",
-        ], f"invalid constraint {constraint_type}"
-
-        rng = np.random.RandomState(seed)
-
-        out = sparse.lil_matrix((self.N, self.N), dtype=int)
-
-        if constraint_type == "production":
-            for i in range(self.N):
-                draw = rng.multinomial(self.data_out[i], p_mat[i])
-                (j,) = draw.nonzero()
-                out[i, j] = draw[j]
-
-        elif constraint_type == "attraction":
-            for j in range(self.N):
-                draw = rng.multinomial(self.data_in[j], p_mat[:, j])
-                (i,) = draw.nonzero()
-                out[i, j] = draw[i]
-
-        return out.tocsr()
-
-    def score_draws(self, pmat, constraint_type, nb_repeats=20):
-        """Calculate goodness-of-fit measures for multiple draws."""
-        out = np.zeros((nb_repeats, 3))
-
-        for k in range(nb_repeats):
-            T = self.draw_multinomial(pmat, constraint_type, seed=k)
-            out[k] = CPC(T, self.data), CPL(T, self.data), RMSE(T, self.data)
-
-        return out
-
-    def constrained_model(
-        self, f_mat: Array, constraint_type: str, maxiters=500, verbose=False
-    ) -> Array:
-        """
-        Calculate the constrained flux from the affinity matrix f_ij.
-
-        Parameters
-        ----------
-        f_mat : array_like
-        constrained : {'unconstrained', 'production', 'attraction', 'doubly'}
-
-        Returns
-        -------
-        np.array
-            NxN constrained flow matrix.
-
-        """
-        if self.data is None:
-            raise DataNotSet("the data for the constraints is needed")
-
-        assert constraint_type in [
-            "unconstrained",
-            "production",
-            "attraction",
-            "doubly",
-        ], f"invalid constraint {constraint_type}"
-
-        if constraint_type == "unconstrained":
-            K = self.data.sum() / f_mat.sum()
-            out = K * f_mat
-
-        elif constraint_type == "production":
-            p_mat = self.probability_matrix(f_mat, constraint_type)
-            out = self.data_out[:, np.newaxis] * p_mat
-
-        elif constraint_type == "attraction":
-            p_mat = self.probability_matrix(f_mat, constraint_type)
-            out = p_mat * self.data_in[np.newaxis, :]
-
-        elif constraint_type == "doubly":
-            out = simple_ipf(
-                f_mat, self.data_out, self.data_in, maxiters=maxiters, verbose=verbose
-            )
-
-        return out
-
-    # def constrained_model(self, model: str,
-    #                       constraint_type: str,
-    #                       params: ParamDict,
-    #                       rounded: bool = False,
-    #                       sparse: bool = False) -> Array:
-    #     """
-    #     Calculate the prediction of a model and apply the constraint type.
-    #
-    #     Parameters
-    #     ----------
-    #     model : {'gravity', 'radiation', 'io'}
-    #     params : dict
-    #     rounded : bool, optional
-    #         Whether to round the output of the model or not (default is False).
-    #     sparse : bool, optional
-    #         Whether to return the output model as a sparse matrix (default is
-    #         False). If set to True, the output is rounded irrespective of the
-    #         kwarg `rounded` which is ignored.
-    #
-    #     Returns
-    #     -------
-    #     np.array
-    #
-    #     """
-    #     method_name = f'{model}_matrix'
-    #     method = getattr(self, method_name, None)
-    #     if method:
-    #         try:
-    #             f_mat = method(**params)
-    #         except Exception as e:
-    #             message = f'Failed to apply model {model} with parameter {params}'
-    #             raise ValueError(message) from e
-    #     else:
-    #         raise NotImplementedError(f'model {model} not implemented')
-    #
-    #     try:
-    #         ϕ = self.constrained_flux(f_mat, constraint_type)
-    #     except Exception as e:
-    #         message = f'Failed to apply constraint type {model}'
-    #         raise ValueError(message) from e
-    #
-    #     if rounded or sparse:
-    #         ϕ = np.round(ϕ).astype(int)
-    #     if sparse:
-    #         ϕ = sparse.csr_matrix(ϕ)
-    #
-    #     return ϕ
-
-    # def CPC_from_model(self, model: str,
-    #                    constraint_type: str,
-    #                    params: ParamDict) -> float:
-    #     """
-    #     Use a particular model and constraint type to calculate the CPC fit.
-    #
-    #     Parameters
-    #     ----------
-    #     model : {'gravity', 'radiation', 'io'}
-    #     params : dict
-    #
-    #     Returns
-    #     -------
-    #     float
-    #
-    #     """
-    #     Data = self.data
-    #     return CPC(Data, self.constrained_model(model, constraint_type, params))
-    #
-
-    def pvalues_approx(
-        self, pmat: Array, constraint_type: str
-    ) -> Tuple[sparse.csr_matrix, sparse.csr_matrix]:
-        """
-        Calculate the p-values using the normal approximation.
-
-        Parameters
-        ----------
-        pmat : Array
-        constraint_type : {'production', 'attraction'}
-
-        Returns
-        -------
-        Tuple[csr_matrix, csr_matrix]
-            The first matrix stores the p-values for the hypothesis
-            "the observation is not signifcantly larger than the predicted mean"
-            and the second matrix for the hypothesis "the observation is not
-            signifcantly smaller than the predicted mean."
-
-        """
-        if self.data is None:
-            raise DataNotSet("the data for comparison is needed")
-
-        assert constraint_type in [
-            "production",
-            "attraction",
-        ], f"invalid constraint {constraint_type}"
-
-        # Entry-wise first and second moments (binomial model)
-        if constraint_type == "production":
-            Exp = self.data_out[:, np.newaxis] * pmat
-        elif constraint_type == "attraction":
-            Exp = pmat * self.data_in[np.newaxis, :]
-        Std = np.sqrt(Exp * (1 - pmat))
-
-        i, j = self.data.nonzero()
-        shp = self.data.shape
-        Z_score = (self.data[i, j] - Exp[i, j]) / Std[i, j]
-        Z_score = np.asarray(Z_score).flatten()
-
-        data_plus = stats.norm.cdf(-Z_score)
-        data_minus = stats.norm.cdf(Z_score)
-
-        plus = sparse.csr_matrix((data_plus, (i, j)), shape=shp)
-        minus = sparse.csr_matrix((data_minus, (i, j)), shape=shp)
-
-        return (plus, minus)
-
-    def pvalues_exact(
-        self, pmat: Array, constraint_type: str
-    ) -> Tuple[sparse.csr_matrix, sparse.csr_matrix]:
-        """
-        Calculate the p-values using the exact binomial distributions.
-
-        Parameters
-        ----------
-        pmat : Array
-        constraint_type : {'production', 'attraction'}
-
-        Returns
-        -------
-        Tuple[csr_matrix, csr_matrix]
-            The first matrix stores the p-values for the hypothesis
-            "the observation is not signifcantly larger than the predicted mean"
-            and the second matrix for the hypothesis "the observation is not
-            signifcantly smaller than the predicted mean."
-
-        """
-        if self.data is None:
-            raise DataNotSet("the data for comparison is needed")
-
-        assert constraint_type in [
-            "production",
-            "attraction",
-        ], f"invalid constraint {constraint_type}"
-
-        ii, jj = self.data.nonzero()
-        shp = self.data.shape
-        n = len(ii)
-        data_plus, data_minus = np.zeros(n), np.zeros(n)
-
-        # The target N is either the row or the column sum
-        Ns = self.data_out[ii] if constraint_type == "production" else self.data_in[jj]
-
-        for k in range(n):
-            i, j = ii[k], jj[k]
-            x, n, p = self.data[i, j], Ns[k], pmat[i, j]
-            data_plus[k] = stats.binom_test(x, n=n, p=p, alternative="greater")
-            data_minus[k] = stats.binom_test(x, n=n, p=p, alternative="less")
-
-        plus = sparse.csr_matrix((data_plus, (ii, jj)), shape=shp)
-        minus = sparse.csr_matrix((data_minus, (ii, jj)), shape=shp)
-
-        return (plus, minus)
-
-    def significant_edges(
-        self,
-        pmat: Array,
-        constraint_type: str,
-        significance: float = 0.01,
-        exact: bool = False,
-        verbose: bool = False,
-    ) -> Tuple[sparse.csr_matrix, sparse.csr_matrix]:
-        """
-        Calculate the significant edges according to a binomial test (or z-test).
-
-        Parameters
-        ----------
-        pmat : Array
-        constraint_type : {'production', 'attraction'}
-        significance : float, optional
-            By default 0.01.
-        exact : bool, optional
-            Whether to use the exact calculation as opposed the normal
-            approximation (z-test). The default is False.
-        verbose : bool, optional
-
-        Returns
-        -------
-        Tuple[csr_matrix, csr_matrix]
-
-        """
-        method_name = "pvalues_" + ("exact" if exact else "approx")
-        method = getattr(self, method_name)
-        plus, minus = method(pmat, constraint_type)
-        mask = self.data.astype(bool)
-
-        sig_plus = (plus < significance).multiply(mask)
-        # needed for elementwise multiplication because sparse is matrix type
-        sig_minus = (minus < significance).multiply(mask)
-
-        if verbose:
-            n, nplus, nminus = mask.nnz, sig_plus.nnz, sig_minus.nnz
-            nzero = n - nplus - nminus
-            tab = [
-                ["Positive (observed larger)", nplus, f"{100*nplus/n:.2f}"],
-                ["Negative (model larger)", nminus, f"{100*nminus/n:.2f}"],
-                ["Not-significant:", nzero, f"{100*nzero/n:.2f}"],
-                ["Total", n, "100.00"],
-            ]
-            print(tabulate(tab, headers=["", "Nb", "%"]))
-
-        return sig_plus, sig_minus
-
-
-# Outside the classes
-# def _binomial_pvalues(N: int, p: float, x: int) -> Tuple[float, float]:
-#     """
-#     Calculate a p-value according to the binomial distribution.
-#
-#     Parameters
-#     ----------
-#     N, p : int, float
-#         The parameters of the binomial distribution.
-#     x : int
-#         The observation.
-#
-#     Returns
-#     -------
-#     float, float
-#
-#     """
-#     # N, x = int(N), int(x)
-#     B = stats.binom(N, p)
-#
-#     # It would be useful to assume x > 0; that case is generally covered
-#     # when I call using T_data.nonzero(). The other limiting case is when
-#     # x == N
-#     if x == N:
-#         out = p**N, 1.0
-#
-#     # Test below is slower (2m23 vs 1m35 for UK commuting data)
-#     # elif x < N // 2:
-#     #     probas = B.pmf(range(x + 1)).cumsum()
-#     #     out = 1 - round(probas[x - 1], 6), round(probas[x], 6)
-#     # else:
-#     #     probas = B.pmf(range(N, x - 1, -1)).cumsum()
-#     #     out = round(probas[-1], 6), 1 - round(probas[-2], 6)
-#
-#     else:
-#         probas = B.pmf(range(x + 1)).cumsum()
-#         out = 1 - round(probas[x - 1], 6), round(probas[x], 6)
-#         # due to numerical errors I can get cumsum larger than 1 and this is why
-#         # we need to use rounding
-#
-#     return out
-
-
-def CPC(F1: Array, F2: Array, rel_tol: float = 1e-3) -> float:
-    """
-    Calculate the common part of commuters between two models.
-
-    Parameters
-    ----------
-    F1, F2 : array_like
-
-    Returns
-    -------
-    float
-
-    """
-    x, y = F1.sum(), F2.sum()
-    assert abs((x - y) / x) < rel_tol, "arrays do not have same sum (up to rel. tol.)"
-    # assert np.isclose(F1.sum(), F2.sum()), 'arrays should have same sum'
-
-    denom_mat = F1 + F2
-    num_mat = denom_mat - np.abs(F1 - F2)  # this implements 2*min(F1, F2)
-
-    return np.sum(num_mat) / np.sum(denom_mat)
-
-
-def CPL(F1: Array, F2: Array, rel_tol: float = 1e-3) -> float:
-    """
-    Calculate the common part of links between two models.
-
-    Parameters
-    ----------
-    F1, F2 : array_like
-
-    Returns
-    -------
-    float
-
-    """
-    x, y = F1.sum(), F2.sum()
-    assert abs((x - y) / x) < rel_tol, "arrays do not have same sum (up to rel. tol.)"
-    # assert np.isclose(F1.sum(), F2.sum()), 'arrays should have same sum'
-
-    bool_F1 = F1 > 0
-    bool_F2 = F2 > 0
-
-    # sparse implements np.matrix and * is mat-mat multplication, not elementwise
-    if sparse.issparse(F1):
-        prod = bool_F1.multiply(bool_F2)
-    elif sparse.issparse(F2):
-        prod = bool_F2.multiply(bool_F1)
-    else:
-        prod = bool_F1 * bool_F2
-
-    return 2 * np.sum(prod) / (np.sum(bool_F1) + np.sum(bool_F2))
-
-
-def RMSE(F1: Array, F2: Array, rel_tol: float = 1e-3, norm=True) -> float:
-    """
-    Calculate root-mean-square error between two models.
-
-    Parameters
-    ----------
-    F1, F2 : array_like
-
-    Returns
-    -------
-    float
-
-    """
-    x, y = F1.sum(), F2.sum()
-    assert abs((x - y) / x) < rel_tol, "arrays do not have same sum (up to rel. tol.)"
-    # assert np.isclose(F1.sum(), F2.sum()), 'arrays should have same sum'
-
-    N = np.prod(F1.shape)
-
-    diff = F1 - F2
-    power = diff.power(2) if sparse.issparse(diff) else np.power(diff, 2)
-    out = np.sqrt(power.sum() / N)
-
-    if norm:
-        out *= N / x
-
-    return out
+    #  @property
+    #  def significance(self):
+    #      return self._significance
+
+    #  @significance.setter
+    #  def significane(self, alpha):
+    #      if 0 < alpha < 1:
+    #          self._significance = alpha
+    #      else:
+    #          raise ValueError("significance should lie inside (0, 1)")
+
+    # End of the basic initialisation functions
 
 
 # def _iterative_proportional_fit(f_mat: Array,
@@ -1140,49 +426,6 @@ class DataNotSet(Exception):
     """Raised when a method needs to access the data and it has not been set."""
 
     pass
-
-
-def simple_ipf(
-    mat: Array,
-    target_rows: Array = None,
-    target_cols: Array = None,
-    return_vecs: bool = False,
-    tol: float = 1e-3,
-    maxiters: int = 100,
-    verbose: bool = False,
-) -> Array:
-    N, _ = mat.shape
-    b = np.ones(N)
-
-    assert not (
-        bool(target_rows is None) != bool(target_cols is None)
-    ), "target_rows and target_cols should be provided or not provided together"
-    # != is exclusive or for normalised boolean variables
-
-    if target_rows is None:
-        target_rows = np.ones(N)
-        target_cols = np.ones(N)
-
-    niter = 0
-
-    while niter < maxiters:
-        a = target_rows / (mat @ b)
-        b = target_cols / (mat.T @ a)
-
-        out = a[:, np.newaxis] * mat * b[np.newaxis, :]
-        bool_row = np.allclose(out.sum(axis=1), target_rows, atol=tol)
-        # rel_tol instead? this is the problem I address inside CPC, etc.
-        bool_col = np.allclose(out.sum(axis=0), target_cols, atol=tol)
-
-        niter += 1
-
-        if bool_row and bool_col:
-            break
-
-    if verbose:
-        print(f"Nb iters until convergence: {niter}")
-
-    return (out, a, b) if return_vecs else out
 
 
 def save_model(
