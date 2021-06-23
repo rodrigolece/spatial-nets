@@ -29,6 +29,12 @@ def _get_iterable(x):
         return (x,)
 
 
+def sparsity(mat: sp.csr_matrix):
+    cmat = mat.tocoo()
+    data = np.ones(mat.nnz, dtype=bool)
+    return sp.csr_matrix((data, (cmat.row, cmat.col)), shape=mat.shape)
+
+
 def build_graph(mat, directed=True, coords=None, vertex_properties={}):
     """Build a Graph from a given mat and a subset of the nonzero entries."""
     nb_nodes, m = mat.shape

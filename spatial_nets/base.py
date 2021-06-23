@@ -7,6 +7,7 @@ import graph_tool as gt
 from tabulate import tabulate
 
 from spatial_nets.locations import LocationsDataClass, DataNotSet
+from spatial_nets.utils import sparsity
 
 
 class Model(ABC):
@@ -99,8 +100,8 @@ class PValues:
         coef=None,
         balancing_factors=None,
     ):
-        mask = right.astype(bool)
-        if (mask != left.astype(bool)).nnz > 0:
+        mask = sparsity(right)
+        if (mask != sparsity(left)).nnz > 0:
             raise ValueError("the sparsity pattern of the matrices does not match")
 
         self.mask = mask
