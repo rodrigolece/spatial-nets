@@ -1,5 +1,7 @@
+import os
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Optional, Union
+import pickle
 
 import numpy as np
 import scipy.sparse as sp
@@ -97,6 +99,7 @@ class PValues:
         verbose: bool = False,
         model=None,
         constraint=None,
+        approx_pvalues=None,
         coef=None,
         balancing_factors=None,
     ):
@@ -113,11 +116,12 @@ class PValues:
         self._significance = None
         self.model = model
         self.constraint = constraint
+        self.approx_pvalues = approx_pvalues
         self.coef = coef
         self.balancing_factors = balancing_factors
 
-    def set_significance(self, significance: float = 0.01):
-        self.significance = significance
+    def set_significance(self, alpha: float = 0.01):
+        self.significance = alpha
 
         return self
 
@@ -132,9 +136,21 @@ class PValues:
         else:
             raise ValueError("significance should lie inside (0, 1)")
 
-    def compute_graph(
-        self,
-    ) -> gt.Graph:
+    def save(self, filename: Union[str, os.PathLike]):
+        if self.model is None:
+            raise DataNotSet("need to provide the name of the model")
+        elif self.constraint is None:
+            raise DataNotSet("need to provide the name of the constraint")
+        elif self.approx_pvalues is None:
+            raise DataNotSet("need to specify whether the calculation was approximate")
+
+        if os.path.splitext(filename)[1] not in (".pkl", ".pickle"):
+            raise ValueError("unsupported format; use pickle instead")
+
+        with open(filename, "wb") as f:
+            pickle.dump(self, f)
+
+    def compute_graph(self) -> gt.Graph:
         """
         Calculate the significant edges according to a binomial test (or z-test).
 
