@@ -22,14 +22,23 @@ class RadiationModel(Model):
         self.finite_correction = finite_correction
 
     def fit(self, data: LocationsDataClass):
-        self.N = len(data)
+        super().fit(data)
+
         self.production = data.production
         self.attraction = data.attraction
         self.dmat = data.dmat
 
         return self
 
+    fit.__doc__ = Model.fit.__doc__
+
     def transform(self):
+        """
+        Compute the radiation model predictions.
+
+        TODO: Mathematical formula goes here
+
+        """
         return self._radiation_matrix(
             threshold=self.threshold,
             finite_correction=self.finite_correction,
@@ -37,7 +46,7 @@ class RadiationModel(Model):
 
     def _io_matrix(self, threshold: float = np.inf) -> np.ndarray:
         """
-        Calculate intervening opportunities matrix summing the dest. relevance.
+        Calculate intervening opportunities matrix summing the attraction vector.
 
         Parameters
         ----------

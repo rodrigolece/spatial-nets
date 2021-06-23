@@ -6,7 +6,7 @@ import numpy as np
 from scipy import optimize
 from sklearn import linear_model
 
-from spatial_nets.locations import LocationsDataClass, DataNotSet
+from spatial_nets.locations import LocationsDataClass
 from spatial_nets.base import Model
 from spatial_nets.metrics import CPC
 from spatial_nets.models.constraints import (
@@ -94,6 +94,12 @@ class GravityModel(Model):
             self.aux_constraint = aux_constraint
 
     def transform(self):
+        """
+        Compute the gravity law predictions.
+
+        TODO: Mathematical formula goes here.
+
+        """
         return self._gravity_matrix(**self.coef_)
 
     def _gravity_matrix(self, γ: float, α: float = 1.0, β: float = 1.0) -> np.ndarray:
@@ -127,21 +133,32 @@ class GravityModel(Model):
         return out
 
     def fit(self, data: LocationsDataClass):
-        """Warning: this overrides any data stored under the `coef_` attribute."""
-        self.N = len(data)
+        """
+        Fit the model to the observations and compute the model parameters.
+
+        This method sets the `coef_` attribute and overwrites any data already
+        stored there.
+
+        wARNING: this method overrides the parameters already stored under `_coef`
+
+        Parameters
+        ----------
+        data : LocationsDataClass
+            The custom object which we defined to store the data. Note that
+            this object needs to have its `flow_data` attribute set.
+
+        Returns
+        -------
+        self
+
+        """
+        super().fit(data)
+
         self.production = data.production
         self.attraction = data.attraction
         self.dmat = data.dmat
 
-        self.total_flow_ = data.flow_data.sum()
-        self.target_rows_ = data.target_rows
-        self.target_cols_ = data.target_cols
-
         if self.routine is not None:
-            if data.flow_data is None:
-                raise DataNotSet("the flow data for comparison is needed")
-
-            self.flow_data = data.flow_data
             self.aux_constraint.fit(data)
             try:
                 self.coef_ = self.routine(
@@ -158,18 +175,7 @@ class GravityModel(Model):
         use_log=False,
         verbose: bool = False,
     ) -> Dict[str, float]:
-        """
-        Calibrate the gravity model using nonlinear least squares.
-
-        Parameters
-        ----------
-        constraint : str
-
-        Returns
-        -------
-        float, float
-
-        """
+        """Calibrate the gravity model using nonlinear least squares."""
 
         def cost_fun(x, template, y, idx, use_log):
             kwargs = kwargs_from_vec(x, template)
@@ -232,18 +238,7 @@ class GravityModel(Model):
         verbose: bool = False,
         **kwargs,
     ) -> Dict[str, float]:
-        """
-        Calibrate the gravity model using CPC minisation
-
-        Parameters
-        ----------
-        constraint_type : str
-
-        Returns
-        -------
-        float, float
-
-        """
+        """Calibrate the gravity model using CPC maximisation."""
 
         def cost_fun(x, template):
             kwargs = kwargs_from_vec(x, template)
@@ -280,19 +275,8 @@ class GravityModel(Model):
         return kwargs_from_vec(res.x, template_args)
 
     def _linreg(self, verbose: bool = False, **kwargs) -> Dict[str, float]:
-        """
-        Calibrate the gravity parameters using linear least squares regression.
+        """Calibrate the gravity parameters using linear least squares regression."""
 
-        Parameters
-        ----------
-        verbose: bool, optional
-            The default is False
-
-        Returns
-        -------
-        γ, α, β : float
-
-        """
         # The observations
         i, j = self.flow_data.nonzero()
         y = np.asarray(self.flow_data[i, j]).flatten()

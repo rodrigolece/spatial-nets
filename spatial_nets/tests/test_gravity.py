@@ -1,7 +1,7 @@
 import unittest
 
 import numpy as np
-from spatial_nets.locations import LocationsDataClass, DataNotSet
+from spatial_nets.locations import LocationsDataClass
 from spatial_nets.models.gravity import GravityModel
 
 

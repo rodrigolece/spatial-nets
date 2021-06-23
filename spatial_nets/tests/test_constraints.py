@@ -34,7 +34,7 @@ class TestUnconstrainedModel(unittest.TestCase):
         model.fit(self.locs)
         normalised_mat = model.transform(self.prediction)  # the prediction was 2*data
         self.assertEqual(normalised_mat.sum(), 6.0)
-        self.assertIsNone(model.probabilities_)  # this model does not set the probas
+        #  self.assertIsNone(model.probabilities_)  # this model does not set the probas
 
 
 class TestProductionConstrained(unittest.TestCase):
@@ -47,11 +47,12 @@ class TestProductionConstrained(unittest.TestCase):
         # TODO: change this to the gravity or rad models?
 
     def test_fit(self):
-        model = ProductionConstrained(constraint="production")
+        model = ProductionConstrained()
         model.fit(self.locs)
         self.assertEqual(model.total_flow_, 6)
         self.assertTrue(np.allclose(model.target_rows_, [2, 2, 2]))
         self.assertTrue(np.allclose(model.target_cols_, [2, 2, 2]))
+        self.assertIsNone(model.probabilities_)
 
     def test_transform(self):
         model = ProductionConstrained()
@@ -73,11 +74,12 @@ class TestAttractionConstrained(unittest.TestCase):
         # TODO: change this to the gravity or rad models?
 
     def test_fit(self):
-        model = AttractionConstrained(constraint="attraction")
+        model = AttractionConstrained()
         model.fit(self.locs)
         self.assertEqual(model.total_flow_, 6)
         self.assertTrue(np.allclose(model.target_rows_, [2, 2, 2]))
         self.assertTrue(np.allclose(model.target_cols_, [2, 2, 2]))
+        self.assertIsNone(model.probabilities_)
 
     def test_transform(self):
         model = AttractionConstrained()
@@ -99,11 +101,12 @@ class TestDoublyConstrained(unittest.TestCase):
         # TODO: change this to the gravity or rad models?
 
     def test_fit(self):
-        model = DoublyConstrained(constraint="doubly")
+        model = DoublyConstrained()
         model.fit(self.locs)
         self.assertEqual(model.total_flow_, 6)
         self.assertTrue(np.allclose(model.target_rows_, [2, 2, 2]))
         self.assertTrue(np.allclose(model.target_cols_, [2, 2, 2]))
+        self.assertIsNone(model.probabilities_)
 
     def test_transform(self):
         model = DoublyConstrained()
@@ -115,3 +118,10 @@ class TestDoublyConstrained(unittest.TestCase):
         self.assertTrue(np.allclose(normalised_mat.sum(axis=1), self.locs.target_cols))
         self.assertIsNotNone(model.probabilities_)
         self.assertTrue(np.allclose(model.probabilities_[0], [0, 0.5, 0.5]))
+
+        # Below we test that we correctly factorised the probabilities as prod constrained
+        self.assertTrue(
+            np.allclose(
+                normalised_mat, model.target_rows_[:, np.newaxis] * model.probabilities_
+            )
+        )
