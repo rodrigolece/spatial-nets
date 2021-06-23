@@ -148,9 +148,14 @@ class PValues:
         if self.significance is None:
             raise DataNotSet("`set_significance` has not been called")
 
-        # elementwise multiplication with mask to preserve sparsity
-        sig_plus: sp.csr_matrix = (self.right < self.significance).multiply(self.mask)
-        sig_minus: sp.csr_matrix = (self.left < self.significance).multiply(self.mask)
+        # Below we wrote the comparison as XOR
+        #  sig_plus: sp.csr_matrix = (self.right < self.significance).multiply(self.mask)
+        compare_plus = self.right >= self.significance
+        sig_plus = (compare_plus > self.mask) + (compare_plus < self.mask)
+
+        #  sig_minus: sp.csr_matrix = (self.left < self.significance).multiply(self.mask)
+        compare_minus = self.left >= self.significance
+        sig_minus = (compare_minus > self.mask) + (compare_minus < self.mask)
 
         if self.verbose:
             n, nplus, nminus = self.mask.nnz, sig_plus.nnz, sig_minus.nnz
