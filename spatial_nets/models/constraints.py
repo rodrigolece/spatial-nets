@@ -1,6 +1,7 @@
 from abc import ABC
 from typing import Tuple, Optional
 
+from tqdm import tqdm
 import numpy as np
 import scipy.sparse as sp
 from scipy import stats
@@ -97,7 +98,7 @@ class ConstrainedModel(Model, ABC):
             else self.target_cols_[jj]
         )
 
-        for k in range(n):
+        for k in tqdm(range(n)):
             i, j = ii[k], jj[k]
             x, n, p = self.flow_data[i, j], Ns[k], pmat[i, j]
             data_plus[k] = stats.binom_test(x, n=n, p=p, alternative="greater")

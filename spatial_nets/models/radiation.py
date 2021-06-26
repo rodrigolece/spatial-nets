@@ -32,7 +32,7 @@ class RadiationModel(Model):
 
     fit.__doc__ = Model.fit.__doc__
 
-    def transform(self):
+    def transform(self, mat=None):
         """
         Compute the radiation model predictions.
 

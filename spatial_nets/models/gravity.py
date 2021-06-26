@@ -93,7 +93,7 @@ class GravityModel(Model):
 
             self.aux_constraint = aux_constraint
 
-    def transform(self):
+    def transform(self, mat=None):
         """
         Compute the gravity law predictions.
 
@@ -168,6 +168,8 @@ class GravityModel(Model):
                 )
             except AssertionError as e:
                 warnings.warn(str(e))
+
+        return self
 
     def _nonlinear_leastsquares(
         self,
