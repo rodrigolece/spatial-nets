@@ -5,8 +5,7 @@ import numpy as np
 import scipy.sparse as sp
 from scipy import stats
 
-from spatial_nets.base import Model, PValues
-from spatial_nets.locations import DataNotSet
+from spatial_nets.base import Model, PValues, DataNotSet
 
 
 class UnconstrainedModel(Model):

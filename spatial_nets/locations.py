@@ -277,9 +277,3 @@ class LocationsDataClass:
         return None
 
     # End of the basic initialisation functions
-
-
-class DataNotSet(Exception):
-    """Raised when a method needs to access the data and it has not been set."""
-
-    pass

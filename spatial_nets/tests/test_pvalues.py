@@ -5,7 +5,8 @@ from scipy.stats import norm, binom
 
 #  import scipy.sparse as sp
 
-from spatial_nets.locations import LocationsDataClass, DataNotSet
+from spatial_nets.base import DataNotSet
+from spatial_nets.locations import LocationsDataClass
 from spatial_nets.models.constraints import ProductionConstrained
 
 

@@ -8,8 +8,14 @@ import scipy.sparse as sp
 import graph_tool as gt
 from tabulate import tabulate
 
-from spatial_nets.locations import LocationsDataClass, DataNotSet
+from spatial_nets.locations import LocationsDataClass
 from spatial_nets.utils import sparsity
+
+
+class DataNotSet(Exception):
+    """Raised when a method needs to access the data and it has not been set."""
+
+    pass
 
 
 class Model(ABC):
