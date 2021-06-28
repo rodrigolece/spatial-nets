@@ -1,6 +1,6 @@
 import os
 from abc import ABC, abstractmethod
-from typing import Optional, Union
+from typing import Tuple, Optional, Union
 import pickle
 
 import numpy as np
@@ -120,6 +120,9 @@ class PValues:
         self.verbose = verbose
 
         self._significance = None
+        self._significant_right = None
+        self._significant_left = None
+
         self.model = model
         self.constraint = constraint
         self.approx_pvalues = approx_pvalues
@@ -156,18 +159,7 @@ class PValues:
         with open(filename, "wb") as f:
             pickle.dump(self, f)
 
-    def compute_graph(self) -> gt.Graph:
-        """
-        Calculate the significant edges according to a binomial test (or z-test).
-
-        Parameters
-        ----------
-
-        Returns
-        -------
-        gt.Graph
-
-        """
+    def compute_backbone(self) -> Tuple[sp.csr_matrix, sp.csr_matrix]:
         if self.significance is None:
             raise DataNotSet("`set_significance` has not been called")
 
@@ -190,6 +182,45 @@ class PValues:
                 ["Total", n, "100.00"],
             ]
             print(tabulate(tab, headers=["", "Nb", "%"]))
+
+        # We "cache" these two matrices
+        self._significant_right = sig_plus
+        self._significant_left = sig_minus
+
+        return sig_plus, sig_minus
+
+    def compute_not_significant(self) -> sp.csr_matrix:
+        if self.significance is None:
+            raise DataNotSet("`set_significance` has not been called")
+
+        if self._significant_left is None:
+            sig_plus, sig_minus = self.compute_backbone()
+        else:
+            sig_plus, sig_minus = self._significant_right, self._significant_left
+
+        i, j = self.mask.nonzero()
+        not_significant = np.asarray(
+            ~np.bitwise_or(sig_plus[i, j], sig_minus[i, j])
+        ).flatten()
+
+        return sp.csr_matrix((not_significant, (i, j)), shape=self.mask.shape)
+
+    def compute_graph(self) -> gt.Graph:
+        """
+        Calculate the significant edges according to a binomial test (or z-test).
+
+        Parameters
+        ----------
+
+        Returns
+        -------
+        gt.Graph
+
+        """
+        if self._significant_left is None:
+            sig_plus, sig_minus = self.compute_backbone()
+        else:
+            sig_plus, sig_minus = self._significant_right, self._significant_left
 
         G = gt.Graph(directed=True)
         G.add_vertex(self.N)

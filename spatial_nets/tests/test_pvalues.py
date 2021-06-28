@@ -1,6 +1,7 @@
 import unittest
 
 import numpy as np
+import scipy.sparse as sp
 from scipy.stats import norm, binom
 
 #  import scipy.sparse as sp
@@ -65,6 +66,20 @@ class TestPvalues(unittest.TestCase):
         )
         self.assertEqual(p[1, 0], 3 / 4)
         self.assertEqual(m[1, 0], 3 / 4)
+
+    def test_compute_not_significant(self):
+        model = ProductionConstrained()  # default: approx_pvalues=False
+        model.fit(self.locs).transform(self.prediction)
+        pvals = model.pvalues()
+        with self.assertRaises(DataNotSet):
+            pvals.compute_graph()
+
+        pvals.set_significance()  # defauls: 0.01
+        zero = pvals.compute_not_significant()
+        self.assertTrue(sp.issparse(zero))
+        self.assertTrue(
+            np.allclose(zero.toarray().astype(int), [[0, 0, 0], [1, 0, 1], [1, 1, 0]])
+        )
 
     def test_compute_graph(self):
         model = ProductionConstrained()  # default: approx_pvalues=False
