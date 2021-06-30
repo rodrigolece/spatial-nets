@@ -248,13 +248,11 @@ def sparsemat_remove_diag(spmat):
 #     return df
 
 
-def benchmark_cerina(
-    nb_nodes, edge_density, ell, beta, epsilon, L=1.0, directed=False, seed=0
-):
+def benchmark_cerina(nb_nodes, rho, ell, beta, epsilon, L=1.0, directed=False, seed=0):
     """Create a benchmark network of the type proposed by Cerina et al."""
     N = nb_nodes
 
-    nb_edges = int(N * (N - 1) * edge_density)
+    nb_edges = int(N * (N - 1) * rho)
     if not directed:
         nb_edges //= 2
 
@@ -308,9 +306,7 @@ def benchmark_cerina(
     return coords, comm_vec, mat
 
 
-def benchmark_expert(
-    nb_nodes, edge_density, lamb, gamma, L=100.0, directed=False, seed=0
-):
+def benchmark_expert(nb_nodes, rho, lamb, gamma, L=100.0, directed=False, seed=0):
     """Create a benchmark network of the type proposed by Expert et al."""
     lamb = _get_iterable(lamb)
     if directed:
@@ -320,7 +316,7 @@ def benchmark_expert(
 
     N = nb_nodes
 
-    nb_edges = int(N * (N - 1) * edge_density)
+    nb_edges = int(N * (N - 1) * rho)
     if not directed:
         nb_edges //= 2
 

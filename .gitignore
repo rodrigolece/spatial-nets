@@ -8,3 +8,7 @@ notebooks/
 test/
 output/
 validation/output/*
+
+figure_scripts/output/*
+figure_scripts/helper*
+figure_scripts/log*

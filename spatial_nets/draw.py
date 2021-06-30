@@ -6,6 +6,7 @@ import colorsys
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 from spatial_nets import utils
+from spatial_nets import PValues, LocationsDataClass
 
 
 # default_cm = gt.default_cm  # 'Set3'
@@ -29,6 +30,8 @@ default_names = [
     "snowy_mint",
     "witch_haze",
 ]
+
+named_colors = dict(zip(default_names, set3_colors))
 
 
 def display_cmap(cmap, N=20, ax=None):
@@ -114,78 +117,44 @@ def gt_color_legend(
 
 
 def signed_scatterplot(
-    locs,
-    T_model,
-    idx_tuple,
+    locs: LocationsDataClass,
+    T_model: np.ndarray,
+    pvals: PValues,
     ax,
-    sample=None,
-    colors=["C0", "C1", "0.75"],
     alpha=0.2,
     fs=18,
-    rounded=False,
-    threshold=None,
+    verbose=False,
+    #  rounded=False,
+    #  threshold=None,
 ):
-    # TODO: colors can be removed, better to use cycler
 
-    idx_tuple = utils._get_iterable(idx_tuple)
-    assert len(idx_tuple) in (2, 3), "invalid list of indices"
+    data = locs.flow_data
+    pvals.verbose = verbose  # useful for debugging
+    sig_plus, sig_minus = pvals.compute_backbone()
+    zero = pvals.compute_not_significant()
 
-    if len(idx_tuple) == 2:
-        idx_plus, idx_minus = idx_tuple
-        idx_zero = ~np.bitwise_or(idx_plus, idx_minus)
-    else:
-        idx_plus, idx_minus, idx_zero = idx_tuple
+    plus_observed = np.asarray(data[sig_plus.nonzero()]).flatten()
+    plus_predicted = T_model[sig_plus.nonzero()]
 
-    i, j = locs.data.nonzero()
-    if sample is not None:
-        i, j = i[sample], j[sample]
+    minus_observed = np.asarray(data[sig_minus.nonzero()]).flatten()
+    minus_predicted = T_model[sig_minus.nonzero()]
 
-    observed = np.asarray(locs.data[i, j]).flatten()
-    predicted = T_model[i, j]
+    zero_observed = np.asarray(data[zero.nonzero()]).flatten()
+    zero_predicted = T_model[zero.nonzero()]
 
-    plus_observed = observed[idx_plus]
-    plus_predicted = predicted[idx_plus]
+    #  if rounded:
+    #      plus_predicted = plus_predicted.round()
+    #      minus_predicted = minus_predicted.round()
+    #      zero_predicted = zero_predicted.round()
 
-    minus_observed = observed[idx_minus]
-    minus_predicted = predicted[idx_minus]
+    #  if threshold:
+    #      plus_predicted[plus_predicted < threshold] = 0.0
+    #      minus_predicted[minus_predicted < threshold] = 0.0
+    #      zero_predicted[zero_predicted < threshold] = 0.0
 
-    zero_observed = observed[idx_zero]
-    zero_predicted = predicted[idx_zero]
-
-    if rounded:
-        plus_predicted = plus_predicted.round()
-        minus_predicted = minus_predicted.round()
-        zero_predicted = zero_predicted.round()
-
-    if threshold:
-        plus_predicted[plus_predicted < threshold] = 0.0
-        minus_predicted[minus_predicted < threshold] = 0.0
-        zero_predicted[zero_predicted < threshold] = 0.0
-
-    ax.plot(
-        minus_observed,
-        minus_predicted,
-        ".",
-        color=colors[0],
-        alpha=alpha,
-        label="negative",
-    )
-    ax.plot(
-        plus_observed,
-        plus_predicted,
-        ".",
-        color=colors[1],
-        alpha=alpha,
-        label="positive",
-    )
-    ax.plot(
-        zero_observed,
-        zero_predicted,
-        ".",
-        color=colors[2],
-        alpha=alpha,
-        label="not significant",
-    )
+    ax.plot(minus_observed, minus_predicted, ".", alpha=alpha, label="left")
+    ax.plot(plus_observed, plus_predicted, ".", alpha=alpha, label="right")
+    ax.plot(zero_observed, zero_predicted, ".", alpha=alpha, label="not significant")
 
     x, X, y, Y = ax.axis()
     mM = max(x, y), min(X, Y)
@@ -195,6 +164,40 @@ def signed_scatterplot(
 
     ax.set_xlabel("Observed flow", fontsize=fs)
     ax.set_ylabel("Predicted flow", fontsize=fs)
+
+    return None
+
+
+def signed_distance_histogram(
+    locs: LocationsDataClass,
+    pvals: PValues,
+    ax,
+    nbins=20,
+    alpha=0.4,
+    fs=18,
+    verbose=False,
+):
+
+    dmat = locs.dmat
+    ds = dmat[np.triu_indices_from(dmat, k=1)]
+    m, M = ds.min(), ds.max()
+    bins = np.logspace(np.log10(m), np.log10(M), nbins + 1)
+
+    pvals.verbose = verbose  # useful for debugging
+    sig_plus, sig_minus = pvals.compute_backbone()
+    zero = pvals.compute_not_significant()
+
+    ds_plus = dmat[sig_plus.nonzero()]
+    ds_minus = dmat[sig_minus.nonzero()]
+    ds_zero = dmat[zero.nonzero()]
+
+    ax.hist(ds_minus, bins, alpha=alpha, label="left")
+    ax.hist(ds_plus, bins, alpha=alpha, label="right")
+    ax.hist(ds_zero, bins, alpha=alpha, label="not significant")
+    ax.set_xscale("log")
+
+    #  ax.set_xlabel("Distance", fontsize=fs)
+    #  ax.set_ylabel("Edge counts", fontsize=fs)
 
     return None
 
