@@ -28,12 +28,18 @@ class UnconstrainedModel(Model):
 
 
 class ConstrainedModel(Model, ABC):
-    def __init__(self, constraint: str, approx_pvalues: bool = False):
+    def __init__(
+        self,
+        constraint: str,
+        approx_pvalues: bool = False,
+        verbose: bool = False,
+    ):
         if constraint is None:
             raise ValueError("invalid constraint")
 
         super().__init__(constraint=constraint)
         self.approx_pvalues = approx_pvalues
+        self.verbose = verbose
 
         self.probabilities_: np.ndarray = None
         self.balancing_factors_: Optional[Tuple[np.ndarray, np.ndarray]] = None
@@ -78,7 +84,7 @@ class ConstrainedModel(Model, ABC):
         plus = sp.csr_matrix((data_plus, (i, j)), shape=shp)
         minus = sp.csr_matrix((data_minus, (i, j)), shape=shp)
 
-        return PValues(right=plus, left=minus, N=self.N)
+        return PValues(right=plus, left=minus, N=self.N, verbose=self.verbose)
 
     def _pvalues_exact(self) -> PValues:
         if (pmat := self.probabilities_) is None:
@@ -108,7 +114,7 @@ class ConstrainedModel(Model, ABC):
         plus = sp.csr_matrix((data_plus, (ii, jj)), shape=shp)
         minus = sp.csr_matrix((data_minus, (ii, jj)), shape=shp)
 
-        return PValues(right=plus, left=minus, N=self.N)
+        return PValues(right=plus, left=minus, N=self.N, verbose=self.verbose)
 
 
 class ProductionConstrained(ConstrainedModel):
@@ -183,14 +189,12 @@ class DoublyConstrained(ConstrainedModel):
     def __init__(
         self,
         tol: float = 1e-3,
-        maxiters: int = 100,
-        verbose: bool = False,
+        maxiters: int = 500,
         **kwargs,
     ):
         super().__init__(constraint="attraction", **kwargs)
         self.tol = tol
         self.maxiters = maxiters
-        self.verbose = verbose
 
     def transform(self, mat: np.ndarray) -> np.ndarray:
         prediction, a, b = simple_ipf(
