@@ -20,7 +20,7 @@ plt.rcParams.update({"axes.prop_cycle": custom_cycler})
 
 
 data_dir = Path(os.environ["workdirc"]) / "data"
-output_dir = Path("output")
+output_dir = Path("output_figures")
 
 dmat = utils.load_dmat(data_dir / "UK_geodesic_dmat.npz")
 data = utils.load_flows(data_dir / "UK_commute2011.npz")

@@ -3,7 +3,6 @@ from pathlib import Path
 
 import numpy as np
 import graph_tool.all as gt
-from tqdm import tqdm
 
 from spatial_nets import *
 from spatial_nets import utils
@@ -15,7 +14,7 @@ verbose = True
 use_approx = False
 
 
-def run_experiment(gamma, n, m, nb_repeats, nb_net_repeats, filename=None):
+def run_experiment(gamma, n, m, nb_repeats, nb_net_repeats):
     N = 100
 
     r = np.logspace(0, 2, n)
@@ -36,9 +35,11 @@ def run_experiment(gamma, n, m, nb_repeats, nb_net_repeats, filename=None):
     for i in range(n):
         for j in range(m):
             params = {"rho": rho[i, j], "lamb": lamb[i, j], "gamma": gamma}
-            repeated_runs(
-                ndarray_grav, ndarray_rad, (i, j), N, params, nb_repeats, nb_net_repeats
-            )
+            mn_grav, mn_rad = repeated_runs(N, params, nb_repeats, nb_net_repeats)
+
+            for k in range(3):
+                ndarray_grav[k][i, j] = mn_grav[k]
+                ndarray_rad[k][i, j] = mn_rad[k]
 
     save_grav.update(
         {
@@ -55,17 +56,10 @@ def run_experiment(gamma, n, m, nb_repeats, nb_net_repeats, filename=None):
         }
     )
 
-    if filename is not None:
-        name, ext = os.path.splitext(filename)
-        print(f"\nWriting results to {name}_grav.npz")
-        np.savez(f"{name}_grav.npz", **save_grav)
-
-        print(f"\nWriting results to {name}_rad.npz")
-        np.savez(f"{name}_rad.npz", **save_rad)
+    return save_grav, save_rad
 
 
 def benchmark_graph(N, params, seed=0):
-
     coords, comm_vec, coo_mat = benchmark(N, **params, seed=seed, directed=directed)
 
     bench = utils.build_weighted_graph(
@@ -103,16 +97,7 @@ def backbone_rad_dc(locs):
     return pvals.compute_graph()
 
 
-def repeated_runs(
-    ndarray_grav,
-    ndarray_rad,
-    idx,
-    N,
-    params,
-    nb_repeats,
-    nb_net_repeats,
-    start_seed=0,
-):
+def repeated_runs(N, params, nb_repeats, nb_net_repeats, start_seed=0):
     out_grav = np.zeros((nb_repeats * nb_net_repeats, 3))
     out_rad = np.zeros_like(out_grav)
 
@@ -162,29 +147,36 @@ def repeated_runs(
             out_rad[row] = nmi, B, nmif
 
     mn_grav = out_grav.mean(axis=0)
-    mn_rad = out_grav.mean(axis=1)
+    mn_rad = out_rad.mean(axis=0)
 
-    for k in range(3):
-        ndarray_grav[k][idx] = mn_grav[k]
-        ndarray_rad[k][idx] = mn_rad[k]
-
-    return None
+    return mn_grav, mn_rad
 
 
 if __name__ == "__main__":
-    output_dir = Path("output")
-    gamma = 2.0
+    gamma = 1.0
 
     n, m = 5, 5
-    nb_repeats = 10
-    nb_net_repeats = 10
+    nb_repeats = 2
+    nb_net_repeats = 2
     #  n, m = 10, 10
     #  nb_repeats = 10
     #  nb_net_repeats = 10
-    filename = f"expert-rho-lamb_gamma2_{nb_repeats:02}_{nb_net_repeats:02}.npz"
-    run_experiment(
-        gamma, n, m, nb_repeats, nb_net_repeats, filename=output_dir / filename
+
+    grav, rad = run_experiment(gamma, n, m, nb_repeats, nb_net_repeats)
+
+    output_dir = Path("output_data")
+    filename = (
+        f"expert-rho-lamb_gamma{gamma:.0f}_{nb_repeats:02}_{nb_net_repeats:02}.npz"
     )
+    filename = output_dir / filename
+
+    if filename is not None:
+        name, ext = os.path.splitext(filename)
+        print(f"\nWriting results to {name}_grav.npz")
+        np.savez(f"{name}_grav.npz", **grav)
+
+        print(f"\nWriting results to {name}_rad.npz")
+        np.savez(f"{name}_rad.npz", **rad)
 
     # Below could be useful for tests
     #  N = 100

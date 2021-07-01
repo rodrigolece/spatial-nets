@@ -9,6 +9,7 @@ test/
 output/
 validation/output/*
 
-figure_scripts/output/*
+figure_scripts/output_figures/*
+figure_scripts/output_data/*
 figure_scripts/helper*
 figure_scripts/log*

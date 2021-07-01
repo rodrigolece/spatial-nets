@@ -7,7 +7,7 @@ from spatial_nets import utils
 
 
 data_dir = Path(os.environ["workdirc"]) / "data"
-output_dir = Path("output")
+output_dir = Path("output_data")
 
 approx = True
 

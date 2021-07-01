@@ -2,7 +2,6 @@ import os
 from pathlib import Path
 
 import numpy as np
-from scipy.io import loadmat
 
 import matplotlib.pyplot as plt
 
@@ -23,35 +22,51 @@ data_dir = Path("output_data")
 output_dir = Path("output_figures")
 
 
-var = "nmi"  # nmi_std, Bs, Bs_std
+var = "nmi"  # nmi, Bs, nmif
 #  normalize the color scale for the NMI
 #  norm = Normalize(0.0, 1.0)
 #  Below is used instead of norm
 kwargs = {}
+levels = None
 if var != "Bs":
     nb_levels = 10
     levels = np.linspace(0, 1, nb_levels + 1)
     kwargs.update(dict(levels=levels, vmin=0, vmax=1))
 
-labels = [r"$\rho$", r"$\lambda$", var.upper()]
+clabel = var.upper()
+if var != "nmi":
+    clabel = clabel[:-1]
+labels = [r"$\rho$", r"$\lambda$", clabel]
 
 files = {
-    "mod-expert-rho-lamb_gamma2_binsize2_1_10.mat": "rajah_hls",
-    "mod-expert-rho-lamb_gamma1_binsize2_1_10.mat": "rajah_hls",
+    # Gravity
+    "expert-rho-lamb_gamma2_10_10_grav.npz": "melrose_hls",
+    "expert-rho-lamb_gamma1_10_10_grav.npz": "melrose_hls",
+    # Rad, for the time being small matrices
+    "expert-rho-lamb_gamma2_02_02_rad.npz": "shakespeare_hls",
+    "expert-rho-lamb_gamma1_02_02_rad.npz": "shakespeare_hls",
+    #  "expert-rho-lamb_gamma2_10_10_rad.npz": "shakespeare_hls",
+    #  "expert-rho-lamb_gamma1_10_10_rad.npz": "shakespeare_hls",
 }
 
-#  for bins in [1, 2, 5]:
 for f, cname in files.items():
     base, ext = os.path.splitext(f)
     plt.set_cmap(cmaps[cname].reversed())
 
-    data = loadmat(data_dir / f)
+    data = np.load(data_dir / f)
+
+    # We remove values that are slightly larger than 1 (for NMI artifacts)
+    Z = data[var]
+    if levels is not None and (diff := levels[-1] - np.max(Z)) < 0:
+        if np.abs(diff) < 1e-6:
+            print("Removing small artifact")
+            Z = np.maximum(Z + diff, 0)
 
     fig, ax = plt.subplots(figsize=(5, 4))
     draw.contourf(
         data["rho"],
         data["lamb"],
-        data[var],
+        Z,
         ax,
         fig,
         labels=labels,
@@ -70,8 +85,12 @@ for f, cname in files.items():
     #  ax.set_title(base)
 
     if SAVEFIG:
-        descriptor = "_".join(base.split("_")[1:])
-        filename = f"contourf_mod_{descriptor}.{FORMAT}"
+        descriptor = base.split("_")[1:]
+        model = descriptor.pop(-1)
+        descriptor = "_".join(descriptor)
+        fix = "-fix" if var == "nmif" else ""
+        filename = f"contourf_{model}{fix}_{descriptor}.{FORMAT}"
+
         print("Saving to: ", filename)
         fig.savefig(
             output_dir / filename,
