@@ -13,7 +13,7 @@ from spatial_nets import draw
 
 from config import SAVEFIG, FORMAT
 
-plt.rcParams.update({"font.size": 14})
+plt.rcParams.update({"font.size": 20})
 cmaps = draw.setup_default_colormaps()
 #  plt.set_cmap("Greys_r")
 
@@ -48,8 +48,9 @@ files = {
     #  "expert-rho-lamb_gamma2_10_10_rad.npz": "shakespeare_hls",
     #  "expert-rho-lamb_gamma1_10_10_rad.npz": "shakespeare_hls",
 }
+cbars = [True, False, True, False]
 
-for f, cname in files.items():
+for k, (f, cname) in enumerate(files.items()):
     base, ext = os.path.splitext(f)
     plt.set_cmap(cmaps[cname].reversed())
 
@@ -70,7 +71,7 @@ for f, cname in files.items():
         ax,
         fig,
         labels=labels,
-        colorbar=True,
+        colorbar=cbars[k],
         **kwargs,
     )
     ax.set_xscale("log")

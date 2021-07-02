@@ -14,7 +14,7 @@ from spatial_nets import draw
 
 from config import SAVEFIG, FORMAT
 
-plt.rcParams.update({"font.size": 14})
+plt.rcParams.update({"font.size": 20})
 cmaps = draw.setup_default_colormaps()
 #  plt.set_cmap("Greys_r")
 
@@ -39,9 +39,10 @@ files = {
     "mod-expert-rho-lamb_gamma2_binsize2_1_10.mat": "rajah_hls",
     "mod-expert-rho-lamb_gamma1_binsize2_1_10.mat": "rajah_hls",
 }
+cbars = [True, False]
 
 #  for bins in [1, 2, 5]:
-for f, cname in files.items():
+for k, (f, cname) in enumerate(files.items()):
     base, ext = os.path.splitext(f)
     plt.set_cmap(cmaps[cname].reversed())
 
@@ -55,7 +56,7 @@ for f, cname in files.items():
         ax,
         fig,
         labels=labels,
-        colorbar=True,
+        colorbar=cbars[k],
         **kwargs,
     )
     ax.set_xscale("log")
@@ -73,7 +74,4 @@ for f, cname in files.items():
         descriptor = "_".join(base.split("_")[1:])
         filename = f"contourf_mod_{descriptor}.{FORMAT}"
         print("Saving to: ", filename)
-        fig.savefig(
-            output_dir / filename,
-            bbox_inches="tight",
-        )
+        fig.savefig(output_dir / filename, bbox_inches="tight")
