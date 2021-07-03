@@ -1,9 +1,11 @@
+import sys
 import os
 from pathlib import Path
 import csv
 from ast import literal_eval
 
 import numpy as np
+import pandas as pd
 import graph_tool.all as gt
 
 from spatial_nets import *
@@ -12,7 +14,7 @@ from spatial_nets import utils
 
 benchmark = getattr(utils, "benchmark_expert")
 directed = True
-verbose = True
+verbose = False
 maxiters = 200
 use_approx = False
 
@@ -73,13 +75,22 @@ def network_fit_statistics(g, ground_truth):
     return nmi, state.get_nonempty_B(), state.entropy()
 
 
-def summarise(mat):
+def summarise(mat, nb_repeats, nb_net_repeats):
     mn = mat.mean(axis=0)
     std = mat.std(axis=0)
-    s = mat[:, -1].argmin()
-    best = mat[s, :]
 
-    return mn, std, best
+    # Find the minimum entropy fit for each net
+    bounds = range(0, len(mat) + 1, nb_repeats)
+    idx = []
+
+    for k in range(nb_net_repeats):
+        s = mat[bounds[k] : bounds[k + 1], -1].argmin()
+        idx.append(bounds[k] + s)
+
+    mn_best = mat[idx, :].mean(axis=0)
+    std_best = mat[idx, :].std(axis=0)
+
+    return mn, std, mn_best, std_best
 
 
 def repeated_runs(rowid, N, params, nb_repeats, nb_net_repeats, start_seed=0):
@@ -103,18 +114,30 @@ def repeated_runs(rowid, N, params, nb_repeats, nb_net_repeats, start_seed=0):
             mat_grav[row] = network_fit_statistics(grav_dc, ground_truth)
             mat_rad[row] = network_fit_statistics(rad_pc, ground_truth)
 
-    mn_grav, std_grav, best_grav = summarise(mat_grav)
-    out_grav = [rowid] + mn_grav.tolist() + std_grav.tolist() + best_grav.tolist()
+    mn_grav, std_grav, mnb_grav, stdb_grav = summarise(
+        mat_grav, nb_repeats, nb_net_repeats
+    )
+    out_grav = (
+        [rowid]
+        + mn_grav.tolist()
+        + std_grav.tolist()
+        + mnb_grav.tolist()
+        + stdb_grav.tolist()
+    )
 
-    mn_rad, std_rad, best_rad = summarise(mat_rad)
-    out_rad = [rowid] + mn_rad.tolist() + std_rad.tolist() + best_rad.tolist()
+    mn_rad, std_rad, mnb_rad, stdb_rad = summarise(mat_rad, nb_repeats, nb_net_repeats)
+    out_rad = (
+        [rowid]
+        + mn_rad.tolist()
+        + std_rad.tolist()
+        + mnb_rad.tolist()
+        + stdb_rad.tolist()
+    )
 
     return out_grav, out_rad
 
 
 if __name__ == "__main__":
-    import sys
-    import pandas as pd
 
     args_file, rowid = sys.argv[1:]
     args_file = Path(args_file)

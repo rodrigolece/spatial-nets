@@ -1,3 +1,4 @@
+import sys
 import os
 from pathlib import Path
 import csv
@@ -43,19 +44,18 @@ def set_up_experiment(save_dir, gamma, n, m, nb_repeats, nb_net_repeats):
 
 
 if __name__ == "__main__":
-    import sys
 
     output_dir = Path(sys.argv[1])
-    assert os.path.isdir(output_dir)
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
 
     gamma = 2.0
 
-    n, m = 5, 4
-    nb_repeats = 2
-    nb_net_repeats = 2
-    #  n, m = 10, 10
+    #  n, m = 20, 20
     #  nb_repeats = 10
-    #  nb_net_repeats = 10
+    #  nb_net_repeats = 5
+    n, m = 2, 2
+    nb_repeats = 2
+    nb_net_repeats = 3
 
-    #  output_dir = Path("output_data")
     set_up_experiment(output_dir, gamma, n, m, nb_repeats, nb_net_repeats)
