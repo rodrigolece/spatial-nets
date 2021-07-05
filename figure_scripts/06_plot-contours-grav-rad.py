@@ -22,33 +22,33 @@ data_dir = Path("output_data")
 output_dir = Path("output_figures")
 
 
-var = "nmi"  # nmi, Bs, nmif
+var = "nmi_mn"  # nmi, Bs, nmif
 #  normalize the color scale for the NMI
 #  norm = Normalize(0.0, 1.0)
 #  Below is used instead of norm
-kwargs = {}
 levels = None
-if var != "Bs":
-    nb_levels = 10
-    levels = np.linspace(0, 1, nb_levels + 1)
-    kwargs.update(dict(levels=levels, vmin=0, vmax=1))
+nb_levels = 10
+levels = np.linspace(0, 1, nb_levels + 1)
+#  levels = 0.5 + np.linspace(0, 10, nb_levels + 1)
 
-clabel = var.upper()
-if var != "nmi":
-    clabel = clabel[:-1]
+kwargs = {}
+kwargs.update(dict(levels=levels, vmin=0, vmax=1))
+
+#  clabel = var.upper()
+#  if var != "nmi":
+#      clabel = clabel[:-1]
+#  clabel = "NMI"
+clabel = "NMI"
 labels = [r"$\rho$", r"$\lambda$", clabel]
 
 files = {
-    # Gravity
-    "expert-rho-lamb_gamma2_10_10_grav.npz": "melrose_hls",
-    "expert-rho-lamb_gamma1_10_10_grav.npz": "melrose_hls",
-    # Rad, for the time being small matrices
-    "expert-rho-lamb_gamma2_02_02_rad.npz": "shakespeare_hls",
-    "expert-rho-lamb_gamma1_02_02_rad.npz": "shakespeare_hls",
-    #  "expert-rho-lamb_gamma2_10_10_rad.npz": "shakespeare_hls",
-    #  "expert-rho-lamb_gamma1_10_10_rad.npz": "shakespeare_hls",
+    "expert-rho-lamb_gamma2_05_10_grav.npz": "melrose_hls",
+    "expert-rho-lamb_gamma1_05_10_grav.npz": "melrose_hls",
+    "expert-rho-lamb_gamma2_05_10_rad.npz": "shakespeare_hls",
+    "expert-rho-lamb_gamma1_05_10_rad.npz": "shakespeare_hls",
 }
 cbars = [True, False, True, False]
+#  cbars = [True, True]
 
 for k, (f, cname) in enumerate(files.items()):
     base, ext = os.path.splitext(f)
