@@ -46,6 +46,10 @@ class TestProductionConstrained(unittest.TestCase):
         # We use the input flow data as the matrix to apply the constraints to
         # TODO: change this to the gravity or rad models?
 
+    def test_init(self):
+        model = ProductionConstrained()
+        self.assertEqual(model.constraint, "production")
+
     def test_fit(self):
         model = ProductionConstrained()
         model.fit(self.locs)
@@ -73,6 +77,10 @@ class TestAttractionConstrained(unittest.TestCase):
         # We use the input flow data as the matrix to apply the constraints to
         # TODO: change this to the gravity or rad models?
 
+    def test_init(self):
+        model = AttractionConstrained()
+        self.assertEqual(model.constraint, "attraction")
+
     def test_fit(self):
         model = AttractionConstrained()
         model.fit(self.locs)
@@ -99,6 +107,10 @@ class TestDoublyConstrained(unittest.TestCase):
         self.prediction = 2 * self.locs.flow_data
         # We use the input flow data as the matrix to apply the constraints to
         # TODO: change this to the gravity or rad models?
+
+    def test_init(self):
+        model = DoublyConstrained()
+        self.assertEqual(model.constraint, "doubly")
 
     def test_fit(self):
         model = DoublyConstrained()

@@ -192,7 +192,7 @@ class DoublyConstrained(ConstrainedModel):
         maxiters: int = 500,
         **kwargs,
     ):
-        super().__init__(constraint="attraction", **kwargs)
+        super().__init__(constraint="doubly", **kwargs)
         self.tol = tol
         self.maxiters = maxiters
 
