@@ -1,4 +1,4 @@
-import os
+#  import os
 from pathlib import Path
 
 import numpy as np
@@ -21,37 +21,42 @@ raw_data_dir = Path("raw")
 data_dir = Path("output_data")
 output_dir = Path("output_figures")
 
-coords = np.load(raw_data_dir / "UK_centroids.npz")["longlat"]
+coords: np.ndarray = np.load(raw_data_dir / "UK_centroids.npz")["longlat"]
 
-#  b = np.load(data_dir / "b_geo_grav-doubly_li_10.npy")
-#  b = np.load(data_dir / "b_geo_grav-doubly_lc_10.npy")
-b = np.load(data_dir / "b_geo_grav-doubly_wc_10.npy")
-
+b_files = {
+    "b_geo_grav-doubly_li_10.npy": "li",
+    "b_geo_grav-doubly_lc_10.npy": "lc",
+    "b_geo_grav-doubly_wc_10.npy": "wc",
+}
 # We shift the vector b to get better colors for the regions of interest
-B = b.max()
-c = (b + 4) % (B + 1)  # 3 for li, lc and 4 for wc
+shift = [3, 3, 4]  # 3 for li, lc and 4 for wc
 
-fig, ax = plt.subplots(figsize=(8, 8), subplot_kw=dict(projection=cs.Mercator()))
+for k, (f, extension) in enumerate(b_files.items()):
+    b: np.ndarray = np.load(data_dir / f)
+    B = b.max()
+    c = (b + shift[k]) % (B + 1)
 
-ax.coastlines(resolution="auto", color="0.7")
-ax.set_extent((-10, 2.5, 49.5, 61))
-# ax.gridlines(draw_labels=True)
+    fig, ax = plt.subplots(figsize=(8, 8), subplot_kw=dict(projection=cs.Mercator()))
 
-ax.scatter(
-    coords[:, 0],
-    coords[:, 1],
-    s=40,
-    c=c,
-    alpha=0.8,
-    #  edgecolos="w",
-    cmap=cm,
-    transform=cs.PlateCarree(),
-)
+    ax.coastlines(resolution="auto", color="0.7")
+    ax.set_extent((-10, 2.5, 49.5, 61))
+    # ax.gridlines(draw_labels=True)
 
-#  filename = "map_uk-commuting_li.svg"
-#  filename = "map_uk-commuting_lc.svg"
-filename = "map_uk-commuting_wc.svg"
-fig.savefig(output_dir / filename, bbox_inches="tight")
+    ax.scatter(
+        coords[:, 0],
+        coords[:, 1],
+        s=40,
+        c=c,
+        alpha=0.8,
+        #  edgecolos="w",
+        cmap=cm,
+        transform=cs.PlateCarree(),
+    )
+
+    if SAVEFIG:
+        filename = output_dir / f"map_uk-commuting_{extension}.{FORMAT}"
+        print("Saving map: ", filename)
+        fig.savefig(filename, bbox_inches="tight")
 
 
 # For reference, from old map
