@@ -6,14 +6,14 @@ from spatial_nets import *
 from spatial_nets import utils
 
 
-data_dir = Path(os.environ["workdirc"]) / "data"
+raw_data_dir = Path(os.environ["workdirc"]) / "data"
 output_dir = Path("output_data")
 
 approx = False
 verbose = True
 
-dmat = utils.load_dmat(data_dir / "UK_geodesic_dmat.npz")
-data = utils.load_flows(data_dir / "UK_commute2011.npz")
+dmat = utils.load_dmat(raw_data_dir / "UK_geodesic_dmat.npz")
+data = utils.load_flows(raw_data_dir / "UK_commute2011.npz")
 locs = LocationsDataClass(data, coords=dmat)
 N = len(locs)
 
