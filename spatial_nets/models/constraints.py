@@ -260,15 +260,15 @@ def simple_ipf(
         target_cols = np.ones(N)
 
     niter = 0
-    b = np.ones(N)
+    a = np.ones(N)
 
     while niter < maxiters:
-        a = target_rows / (mat @ b)
         b = target_cols / (mat.T @ a)
+        a = target_rows / (mat @ b)
 
         out = a[:, np.newaxis] * mat * b[np.newaxis, :]
-        bool_row = np.allclose(out.sum(axis=1), target_rows, atol=tol)
         # rel_tol instead? this is the problem I address inside CPC, etc.
+        bool_row = np.allclose(out.sum(axis=1), target_rows, atol=tol)
         bool_col = np.allclose(out.sum(axis=0), target_cols, atol=tol)
 
         niter += 1
