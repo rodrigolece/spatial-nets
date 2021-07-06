@@ -67,6 +67,12 @@ class TestProductionConstrained(unittest.TestCase):
         self.assertIsNotNone(model.probabilities_)
         self.assertTrue(np.allclose(model.probabilities_[0], [0, 0.5, 0.5]))
 
+    def test_multinomial_draw(self):
+        model = ProductionConstrained()
+        model.fit_transform(self.locs, self.prediction)
+        draw = model.multinomial_draw().toarray()
+        self.assertTrue(np.allclose(draw.sum(axis=1), [2, 2, 2]))
+
 
 class TestAttractionConstrained(unittest.TestCase):
     def setUp(self):
@@ -97,6 +103,12 @@ class TestAttractionConstrained(unittest.TestCase):
         self.assertTrue(np.allclose(normalised_mat.sum(axis=0), self.locs.target_cols))
         self.assertIsNotNone(model.probabilities_)
         self.assertTrue(np.allclose(model.probabilities_[:, 0], [0, 0.5, 0.5]))
+
+    def test_multinomial_draw(self):
+        model = AttractionConstrained()
+        model.fit_transform(self.locs, self.prediction)
+        draw = model.multinomial_draw().toarray()
+        self.assertTrue(np.allclose(draw.sum(axis=0), [2, 2, 2]))
 
 
 class TestDoublyConstrained(unittest.TestCase):
@@ -137,3 +149,10 @@ class TestDoublyConstrained(unittest.TestCase):
                 normalised_mat, model.target_rows_[:, np.newaxis] * model.probabilities_
             )
         )
+
+    def test_multinomial_draw(self):
+        model = DoublyConstrained()
+        model.fit_transform(self.locs, self.prediction)
+        draw = model.multinomial_draw().toarray()
+        # NB: the draw satisfies production exactly, but attraction only on expectation
+        self.assertTrue(np.allclose(draw.sum(axis=1), [2, 2, 2]))

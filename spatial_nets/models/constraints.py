@@ -1,10 +1,10 @@
 from abc import ABC
 from typing import Tuple, Optional
 
-from tqdm import tqdm
 import numpy as np
 import scipy.sparse as sp
 from scipy import stats
+from tqdm import tqdm
 
 from spatial_nets.base import Model, PValues, DataNotSet
 
@@ -115,6 +115,29 @@ class ConstrainedModel(Model, ABC):
         minus = sp.csr_matrix((data_minus, (ii, jj)), shape=shp)
 
         return PValues(right=plus, left=minus, N=self.N, verbose=self.verbose)
+
+    def multinomial_draw(self, seed=0):
+        if (pmat := self.probabilities_) is None:
+            raise DataNotSet(
+                "the `probabilities_` attribute is unset",
+                "this issue is normally resolved by calling the `transform` method",
+            )
+        rng = np.random.default_rng(seed)
+        N = self.N
+
+        out = sp.lil_matrix((N, N), dtype=int)
+        if self.constraint in ("production", "doubly"):
+            for i in range(N):
+                draw = rng.multinomial(self.target_rows_[i], pmat[i])
+                (j,) = draw.nonzero()
+                out[i, j] = draw[j]
+        else:  # self.constraint == "attraction"
+            for j in range(N):
+                draw = rng.multinomial(self.target_cols_[j], pmat[:, j])
+                (i,) = draw.nonzero()
+                out[i, j] = draw[i]
+
+        return out.tocsr()
 
 
 class ProductionConstrained(ConstrainedModel):
