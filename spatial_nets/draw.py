@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib import cm
 from matplotlib import colors
@@ -121,13 +122,12 @@ def signed_scatterplot(
     T_model: np.ndarray,
     pvals: PValues,
     ax,
-    alpha=0.2,
-    fs=18,
-    verbose=False,
+    alpha: float = 0.2,
+    fs: float = 18,
+    verbose: bool = False,
     #  rounded=False,
     #  threshold=None,
 ):
-
     data = locs.flow_data
     pvals.verbose = verbose  # useful for debugging
     sig_plus, sig_minus = pvals.compute_backbone()
@@ -166,6 +166,38 @@ def signed_scatterplot(
     ax.set_ylabel("Predicted flow", fontsize=fs)
 
     return None
+
+
+def critical_enveloppes(
+    locs: LocationsDataClass,
+    T_model: np.ndarray,
+    pvals: PValues,
+    ax,
+    alpha: float = 0.5,
+    verbose: bool = False,
+):
+    data = locs.flow_data
+    pvals.verbose = verbose  # useful for debugging
+    sig_plus, sig_minus = pvals.compute_backbone()
+
+    p_obs = np.asarray(data[sig_plus.nonzero()]).flatten()
+    p_pred = T_model[sig_plus.nonzero()]
+    p_df = pd.DataFrame({"x": p_obs, "y": p_pred})
+    p_df = p_df.groupby("x")["y"].max().sort_index()
+    idx = ~(p_df < p_df.cummax())
+    top = p_df.loc[idx]
+
+    m_obs = np.asarray(data[sig_minus.nonzero()]).flatten()
+    m_pred = T_model[sig_minus.nonzero()]
+    m_df = pd.DataFrame({"x": m_obs, "y": m_pred})
+    m_df = m_df.groupby("x")["y"].min().sort_index()[::-1]
+    idx = ~(m_df > m_df.cummin())
+    bottom = m_df.loc[idx]
+
+    ax.plot(top, ls="-", color="0.3", alpha=alpha, label=r"$H_0^*$ boundary")
+    ax.plot(bottom, ls="-", color="0.3", alpha=alpha)
+
+    return top, bottom
 
 
 def signed_distance_histogram(

@@ -7,9 +7,10 @@ spatial_nets.egg-info
 notebooks/
 test/
 output/
-validation/output/*
+validation/output/
 
-figure_scripts/output_figures/*
-figure_scripts/output_data/*
+figure_scripts/output_figures/
+figure_scripts/output_data/
+figure_scripts/raw/
 figure_scripts/helper*
 figure_scripts/log*

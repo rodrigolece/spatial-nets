@@ -167,24 +167,6 @@ def build_weighted_graph(coo_mat, directed=False, coords=None, vertex_properties
     return G
 
 
-def critical_enveloppes(locs, T_model, idx_plus, idx_minus):
-    i, j = locs.data.nonzero()
-    observed = np.asarray(locs.data[i, j]).flatten()
-    predicted = T_model[i, j]
-
-    plus = pd.DataFrame({"x": observed[idx_plus], "y": predicted[idx_plus]})
-    plus = plus.groupby("x")["y"].max().sort_index()
-    idx = ~(plus < plus.cummax())
-    top = plus.loc[idx]
-
-    minus = pd.DataFrame({"x": observed[idx_minus], "y": predicted[idx_minus]})
-    minus = minus.groupby("x")["y"].min().sort_index()[::-1]
-    idx = ~(minus > minus.cummin())
-    bottom = minus.loc[idx]
-
-    return top, bottom
-
-
 def sparsemat_from_flow(flow_df, return_ids=False):
     """Convert flow DataFrame to sparse matrix."""
     idx_i, ids = pd.factorize(flow_df.origin, sort=True)
