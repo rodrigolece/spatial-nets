@@ -17,8 +17,9 @@ def set_up_experiment(save_dir, gamma, n, m, nb_repeats, nb_net_repeats):
     save_dict = {"rho": rho, "lamb": lamb}
     np.savez(save_dir / "rho-lamb_param-grid.npz", **save_dict)
 
-    lamb_12 = lamb + 0.1
-    lamb_21 = np.maximum(lamb - 0.1, 0.0)
+    #  lamb_12 = lamb + 0.1
+    #  lamb_21 = np.maximum(lamb - 0.1, 0.0)
+    lamb_12, lamb_21 = lamb, lamb
     lamb = np.stack((lamb_12, lamb_21), axis=2)
 
     with open(save_dir / "args.csv", "w") as f:
@@ -51,11 +52,8 @@ if __name__ == "__main__":
 
     gamma = 2.0
 
-    #  n, m = 20, 20
-    #  nb_repeats = 10
-    #  nb_net_repeats = 5
-    n, m = 2, 2
-    nb_repeats = 2
-    nb_net_repeats = 3
+    n, m = 20, 20
+    nb_repeats = 10
+    nb_net_repeats = 5
 
     set_up_experiment(output_dir, gamma, n, m, nb_repeats, nb_net_repeats)
