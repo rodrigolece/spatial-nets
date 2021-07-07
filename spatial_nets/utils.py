@@ -23,7 +23,7 @@ from sklearn.metrics import pairwise
 
 def _get_iterable(x):
     """Utility function."""
-    if isinstance(x, collections.Iterable) and not isinstance(x, str):
+    if isinstance(x, Iterable) and not isinstance(x, str):
         return x
     else:
         return (x,)
