@@ -245,6 +245,8 @@ class LocationsDataClass:
     def flow_data(self, flow_mat: Array):
         """Set a copy of the data inside the object."""
         N, m = flow_mat.shape
+        if not sp.issparse(flow_mat):
+            flow_mat = sp.csr_matrix(flow_mat)
 
         if (flow_mat < 0).sum() > 0:  # works for dense and spase matrices
             raise ValueError("data matrix should be non-negative")
@@ -261,13 +263,9 @@ class LocationsDataClass:
 
         # NB: We remove the diagonal from the data matrix BEFORE calculating
         # the row and column sums
-        if sp.issparse(flow_mat):
-            self._flow_data = utils.sparsemat_remove_diag(flow_mat)  # creates a copy
-        else:
-            self._flow_data = flow_mat.copy()
-            self._flow_data[np.diag_indices(self.N)] = 0
+        self._flow_data = utils.sparsemat_remove_diag(flow_mat)  # creates a copy
 
-        # Row and column sums for dense and sparse matrices
+        # Row and column sums
         self.production = np.asarray(self._flow_data.sum(axis=1)).flatten()
         self.attraction = np.asarray(self._flow_data.sum(axis=0)).flatten()
 

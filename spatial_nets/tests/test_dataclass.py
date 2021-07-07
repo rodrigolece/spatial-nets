@@ -29,7 +29,7 @@ class TestLocationsDataClass(unittest.TestCase):
         self.assertEqual(len(locs), 3)
         # Test flows
         self.assertEqual(
-            locs.flow_data.tolist(),
+            locs.flow_data.toarray().tolist(),
             [
                 [0, 1, 1],
                 [1, 0, 1],

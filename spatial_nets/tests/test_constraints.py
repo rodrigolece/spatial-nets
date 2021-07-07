@@ -18,7 +18,7 @@ class TestUnconstrainedModel(unittest.TestCase):
         coords = np.array([[0, 0], [0, 1], [1, 0]])
         flow_data = np.ones((3, 3), dtype=int)
         self.locs = LocationsDataClass(flow_data, coords=coords)
-        self.prediction = 2 * self.locs.flow_data
+        self.prediction = 2 * self.locs.flow_data.toarray()
         # We use the input flow data as the matrix to apply the constraints to
         # TODO: change this to the gravity or rad models?
 
@@ -42,7 +42,7 @@ class TestProductionConstrained(unittest.TestCase):
         coords = np.array([[0, 0], [0, 1], [1, 0]])
         flow_data = np.ones((3, 3), dtype=int)
         self.locs = LocationsDataClass(flow_data, coords=coords)
-        self.prediction = 2 * self.locs.flow_data
+        self.prediction = 2 * self.locs.flow_data.toarray()
         # We use the input flow data as the matrix to apply the constraints to
         # TODO: change this to the gravity or rad models?
 
@@ -79,7 +79,7 @@ class TestAttractionConstrained(unittest.TestCase):
         coords = np.array([[0, 0], [0, 1], [1, 0]])
         flow_data = np.ones((3, 3), dtype=int)
         self.locs = LocationsDataClass(flow_data, coords=coords)
-        self.prediction = 2 * self.locs.flow_data
+        self.prediction = 2 * self.locs.flow_data.toarray()
         # We use the input flow data as the matrix to apply the constraints to
         # TODO: change this to the gravity or rad models?
 
@@ -116,7 +116,7 @@ class TestDoublyConstrained(unittest.TestCase):
         coords = np.array([[0, 0], [0, 1], [1, 0]])
         flow_data = np.ones((3, 3), dtype=int)
         self.locs = LocationsDataClass(flow_data, coords=coords)
-        self.prediction = 2 * self.locs.flow_data
+        self.prediction = 2 * self.locs.flow_data.toarray()
         # We use the input flow data as the matrix to apply the constraints to
         # TODO: change this to the gravity or rad models?
 
