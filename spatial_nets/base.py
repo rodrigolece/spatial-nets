@@ -99,12 +99,12 @@ class Model(ABC):
 class PValues:
     def __init__(
         self,
+        constraint: str,
         right: sp.csr_matrix,
         left: sp.csr_matrix,
         N: int,
         verbose: bool = False,
         model=None,
-        constraint=None,
         approx_pvalues=None,
         coef=None,
         balancing_factors=None,
@@ -116,18 +116,55 @@ class PValues:
         self.mask = mask
         self.right = right
         self.left = left
+        self.constraint = constraint
         self.N = N
         self.verbose = verbose
+
+        self.extend_left = False
+        self.log_not_pmat_ = None
+        self.target_vec_ = None
 
         self._significance = None
         self._significant_right = None
         self._significant_left = None
 
         self.model = model
-        self.constraint = constraint
         self.approx_pvalues = approx_pvalues
         self.coef = coef
         self.balancing_factors = balancing_factors
+
+    def _set_left_data(
+        self,
+        log_not_pmat: np.ndarray,
+        target_vec: np.ndarray,
+    ) -> None:
+        if log_not_pmat.shape != (self.N, self.N):
+            raise ValueError("invalid matrix shape")
+        elif len(target_vec) != self.N:
+            raise ValueError("invalid vector length")
+
+        self.extend_left = True
+        self.log_not_pmat_ = log_not_pmat
+        self.target_vec_ = target_vec
+
+        return None
+
+    def _compute_extended_left(self) -> sp.csr_matrix:
+        if self.significance is None:
+            raise DataNotSet("`set_significance` has not been called")
+
+        if self.log_not_pmat_ is None:
+            raise DataNotSet("`log_not_pmat` was not provided")
+        elif self.target_vec_ is None:
+            raise DataNotSet("`target_vec` was not provided")
+
+        rhs = np.log(self.significance)
+        if self.constraint in ("production", "doubly"):
+            rhs /= self.target_vec_[:, np.newaxis]
+        else:  # attraction
+            rhs /= self.target_vec_[np.newaxis, :]
+
+        return sp.csr_matrix(self.log_not_pmat_ < rhs)
 
     def set_significance(self, alpha: float = 0.01):
         self.significance = alpha
@@ -148,8 +185,6 @@ class PValues:
     def save(self, filename: Union[str, os.PathLike]):
         if self.model is None:
             raise DataNotSet("need to provide the name of the model")
-        elif self.constraint is None:
-            raise DataNotSet("need to provide the name of the constraint")
         elif self.approx_pvalues is None:
             raise DataNotSet("need to specify whether the calculation was approximate")
 
@@ -160,6 +195,11 @@ class PValues:
             pickle.dump(self, f)
 
     def compute_backbone(self) -> Tuple[sp.csr_matrix, sp.csr_matrix]:
+        #  NB: if an entry is True for the non-extended entry, then it will also
+        #  be true for the more stringent extended case which is also computationnally
+        #  less expensive to compute, therefore we might considered skipping
+        #  the left calculation using the binomial distribution entirely when
+        #  `extend_left` is set to True
         if self.significance is None:
             raise DataNotSet("`set_significance` has not been called")
 
@@ -171,13 +211,18 @@ class PValues:
         #  sig_minus: sp.csr_matrix = (self.left < self.significance).multiply(self.mask)
         compare_minus = self.left >= self.significance
         sig_minus = (compare_minus > self.mask) + (compare_minus < self.mask)
+        n, nplus, nminus = self.mask.nnz, sig_plus.nnz, sig_minus.nnz
+        nzero = n - nplus - nminus
+
+        if self.extend_left:
+            sig_minus += self._compute_extended_left()  # bitwise OR
+            n += sig_minus.nnz - nminus
+            nminus = sig_minus.nnz
 
         if self.verbose:
-            n, nplus, nminus = self.mask.nnz, sig_plus.nnz, sig_minus.nnz
-            nzero = n - nplus - nminus
             tab = [
-                ["Positive (observed larger)", nplus, f"{100*nplus/n:.2f}"],
-                ["Negative (model larger)", nminus, f"{100*nminus/n:.2f}"],
+                ["Right significant", nplus, f"{100*nplus/n:.2f}"],
+                ["Left significant", nminus, f"{100*nminus/n:.2f}"],
                 ["Not-significant:", nzero, f"{100*nzero/n:.2f}"],
                 ["Total", n, "100.00"],
             ]
@@ -203,7 +248,10 @@ class PValues:
             ~np.bitwise_or(sig_plus[i, j], sig_minus[i, j])
         ).flatten()
 
-        return sp.csr_matrix((not_significant, (i, j)), shape=self.mask.shape)
+        mat = sp.csc_matrix((not_significant, (i, j)), shape=self.mask.shape)
+        mat.eliminate_zeros()
+
+        return mat
 
     def compute_graph(self) -> gt.Graph:
         """

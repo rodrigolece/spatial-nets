@@ -32,6 +32,7 @@ class ConstrainedModel(Model, ABC):
         self,
         constraint: str,
         approx_pvalues: bool = False,
+        extend_left: bool = False,
         verbose: bool = False,
     ):
         if constraint is None:
@@ -39,6 +40,7 @@ class ConstrainedModel(Model, ABC):
 
         super().__init__(constraint=constraint)
         self.approx_pvalues = approx_pvalues
+        self.extend_left = extend_left
         self.verbose = verbose
 
         self.probabilities_: np.ndarray = None
@@ -73,18 +75,34 @@ class ConstrainedModel(Model, ABC):
 
         Std = np.sqrt(Exp * (1 - pmat))
 
-        i, j = self.flow_data.nonzero()
-        Z_score = (self.flow_data[i, j] - Exp[i, j]) / Std[i, j]
-        Z_score = np.asarray(Z_score).flatten()
+        with np.errstate(invalid="ignore"):
+            Z_score = (self.flow_data.toarray() - Exp) / Std
 
         data_plus = stats.norm.cdf(-Z_score)
         data_minus = stats.norm.cdf(Z_score)
 
         shp = self.flow_data.shape
-        plus = sp.csr_matrix((data_plus, (i, j)), shape=shp)
-        minus = sp.csr_matrix((data_minus, (i, j)), shape=shp)
+        i, j = self.flow_data.nonzero()
+        plus = sp.csr_matrix((data_plus[i, j], (i, j)), shape=shp)
+        minus = sp.csr_matrix((data_minus[i, j], (i, j)), shape=shp)
 
-        return PValues(right=plus, left=minus, N=self.N, verbose=self.verbose)
+        pvals = PValues(
+            constraint=self.constraint,
+            right=plus,
+            left=minus,
+            N=self.N,
+            verbose=self.verbose,
+        )
+
+        if self.extend_left:
+            # Manually chang problematic entries
+            data_minus[np.diag_indices(self.N)] = 1.0
+            data_minus[(data_minus == 0).nonzero()] = 1e-16
+            log_not_pmat = np.log(data_minus)
+            target_vec = np.ones(self.N)  # NB: the target_vec is not used for Z-scores
+            pvals._set_left_data(log_not_pmat, target_vec)
+
+        return pvals
 
     def _pvalues_exact(self) -> PValues:
         if (pmat := self.probabilities_) is None:
@@ -97,16 +115,17 @@ class ConstrainedModel(Model, ABC):
         n = len(ii)
         data_plus, data_minus = np.zeros(n), np.zeros(n)
 
-        # The target N is either the row or the column sum
-        Ns = (
-            self.target_rows_[ii]
+        # The target n in the binom. distrib. is either the row or the column sum
+        target_vec = (
+            self.target_rows_
             if self.constraint in ("production", "doubly")
-            else self.target_cols_[jj]
+            else self.target_cols_
         )
+        idx = ii if self.constraint in ("production", "doubly") else jj
 
         for k in tqdm(range(n)):
             i, j = ii[k], jj[k]
-            x, n, p = self.flow_data[i, j], Ns[k], pmat[i, j]
+            x, n, p = self.flow_data[i, j], target_vec[idx][k], pmat[i, j]
             data_plus[k] = stats.binom_test(x, n=n, p=p, alternative="greater")
             data_minus[k] = stats.binom_test(x, n=n, p=p, alternative="less")
 
@@ -114,7 +133,19 @@ class ConstrainedModel(Model, ABC):
         plus = sp.csr_matrix((data_plus, (ii, jj)), shape=shp)
         minus = sp.csr_matrix((data_minus, (ii, jj)), shape=shp)
 
-        return PValues(right=plus, left=minus, N=self.N, verbose=self.verbose)
+        pvals = PValues(
+            constraint=self.constraint,
+            right=plus,
+            left=minus,
+            N=self.N,
+            verbose=self.verbose,
+        )
+
+        if self.extend_left:
+            log_not_pmat = np.log(1 - self.probabilities_)
+            pvals._set_left_data(log_not_pmat, target_vec)
+
+        return pvals
 
     def multinomial_draw(self, seed=0):
         if (pmat := self.probabilities_) is None:
