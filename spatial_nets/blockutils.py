@@ -11,7 +11,7 @@ def mean_comm_sizes(state: gt.BlockState, dmat: np.ndarray):
     # TODO: pass dmat as property (how about spatialNet type?)
     B = state.get_nonempty_B()
 
-    out = np.zeros(B, dtype=int)
+    out = np.zeros(B)
 
     for c in range(B):
         idx = state.b.a == c
