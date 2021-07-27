@@ -32,7 +32,7 @@ class ConstrainedModel(Model, ABC):
         self,
         constraint: str,
         approx_pvalues: bool = False,
-        extend_left: bool = False,
+        extend_left: bool = True,
         verbose: bool = False,
     ):
         if constraint is None:
