@@ -191,6 +191,17 @@ def sparsemat_remove_diag(spmat):
     return mat
 
 
+def sparsemat_remove_zeros(spmat):
+    """Create a copy of the matrix removing zero rows or columns."""
+    mat = spmat.copy()
+
+    zero_row = np.asarray(spmat.sum(axis=1)).flatten() == 0
+    zero_col = np.asarray(spmat.sum(axis=0)).flatten() == 0
+    mask = ~np.bitwise_or(zero_row, zero_col)
+
+    return mat[mask][:, mask], mask
+
+
 # def total_flows(flow_df, remove_selfflow=False):
 #     """Calculate total flows by summing over origins and destinations."""
 #     if remove_selfflow:
@@ -254,7 +265,6 @@ def benchmark_cerina(nb_nodes, rho, ell, beta, epsilon, L=1.0, directed=False, s
     idx_plane = xs > 0
     idx_success = rng.rand(N) < 1 - epsilon
 
-    n = N // 2
     comm_vec = np.zeros(N, dtype=int)
     comm_vec[np.bitwise_and(idx_plane, idx_success)] = 1
     comm_vec[np.bitwise_and(idx_plane, ~idx_success)] = -1
